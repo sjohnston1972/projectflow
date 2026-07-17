@@ -19,10 +19,29 @@ on:
         description: Released Darwin commit to revert
         required: true
         type: string
+      manifest_hash:
+        description: Immutable Darwin manifest hash
+        required: true
+        type: string
+      repository:
+        description: Expected target repository
+        required: true
+        type: string
       callback_url:
         description: Darwin rollback callback URL
         required: true
         type: string
+      callback_nonce:
+        description: One-time rollback callback nonce
+        required: true
+        type: string
+
+env:
+  CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+  CALLBACK_NONCE: ${{ inputs.callback_nonce }}
+  CALLBACK_REPOSITORY: ${{ inputs.repository }}
+  CALLBACK_MANIFEST_HASH: ${{ inputs.manifest_hash }}
+  CALLBACK_EXECUTION_ID: ${{ inputs.execution_id }}
 
 concurrency:
   group: darwin-rollback-${{ inputs.rollback_id }}
@@ -71,10 +90,7 @@ jobs:
             --arg workflowUrl "$WORKFLOW_URL" \
             '{status:$status,workflowRunId:$workflowRunId,workflowUrl:$workflowUrl}' \
             > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
       - name: Install dependencies
         run: npm ci
@@ -136,10 +152,8 @@ jobs:
             --rawfile patch .darwin/rollback.patch \
             '{status:$status,headSha:$headSha,pullRequestNumber:$pullRequestNumber,pullRequestUrl:$pullRequestUrl,changedFiles:$changedFiles,checks:$checks,patch:$patch}' \
             > .darwin/callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @.darwin/callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/callback.json
 
       - name: Build the rollback preview
         env:
@@ -190,17 +204,16 @@ jobs:
             --arg status preview_ready \
             --arg previewUrl "${PREVIEW_URL}/?study=true" \
             '{status:$status,previewUrl:$previewUrl}' > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
   report_failure:
     needs: rollback
     if: ${{ failure() }}
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v5
       - name: Report workflow failure to Darwin
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
@@ -211,7 +224,4 @@ jobs:
             --arg status failed \
             --arg error "GitHub Actions rollback run failed. Inspect $WORKFLOW_URL for the real logs." \
             '{status:$status,error:$error}' > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json

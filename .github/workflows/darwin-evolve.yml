@@ -11,10 +11,29 @@ on:
         description: Darwin implementation manifest ID
         required: true
         type: string
+      manifest_hash:
+        description: Immutable Darwin manifest hash
+        required: true
+        type: string
+      repository:
+        description: Expected target repository
+        required: true
+        type: string
       callback_url:
         description: Darwin execution callback URL
         required: true
         type: string
+      callback_nonce:
+        description: One-time execution callback nonce
+        required: true
+        type: string
+
+env:
+  CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+  CALLBACK_NONCE: ${{ inputs.callback_nonce }}
+  CALLBACK_REPOSITORY: ${{ inputs.repository }}
+  CALLBACK_MANIFEST_HASH: ${{ inputs.manifest_hash }}
+  CALLBACK_EXECUTION_ID: ${{ inputs.execution_id }}
 
 concurrency:
   group: darwin-${{ inputs.execution_id }}
@@ -29,6 +48,7 @@ jobs:
       base_sha: ${{ steps.bundle.outputs.base_sha }}
       branch: ${{ steps.bundle.outputs.branch }}
     steps:
+      - uses: actions/checkout@v5
       - name: Fetch the authenticated Darwin manifest
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
@@ -36,9 +56,8 @@ jobs:
         run: |
           mkdir -p .darwin
           manifest_url="${CALLBACK_URL%/callback}/manifest"
-          curl --fail-with-body --retry 3 \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            "$manifest_url" > .darwin/bundle.json
+          .github/scripts/darwin-callback.sh \
+            GET "$manifest_url" "" .darwin/bundle.json
 
       - name: Verify repository and immutable base
         id: bundle
@@ -46,15 +65,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_EXECUTION: ${{ inputs.execution_id }}
           EXPECTED_MANIFEST: ${{ inputs.manifest_id }}
+          EXPECTED_MANIFEST_HASH: ${{ inputs.manifest_hash }}
+          EXPECTED_REPOSITORY: ${{ inputs.repository }}
         run: |
           execution_id=$(jq -r '.execution.executionId' .darwin/bundle.json)
           manifest_id=$(jq -r '.manifest.manifestId' .darwin/bundle.json)
+          manifest_hash=$(jq -r '.manifest.manifestHash' .darwin/bundle.json)
           repository=$(jq -r '.execution.repository.fullName' .darwin/bundle.json)
           base_sha=$(jq -r '.execution.baseSha' .darwin/bundle.json)
           branch=$(jq -r '.execution.branch' .darwin/bundle.json)
           current_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
           test "$execution_id" = "$EXPECTED_EXECUTION"
           test "$manifest_id" = "$EXPECTED_MANIFEST"
+          test "$manifest_hash" = "$EXPECTED_MANIFEST_HASH"
+          test "$repository" = "$EXPECTED_REPOSITORY"
           test "$repository" = "$GITHUB_REPOSITORY"
           test "$base_sha" = "$current_sha"
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
@@ -95,10 +119,7 @@ jobs:
             --arg workflowUrl "$WORKFLOW_URL" \
             '{status:$status,workflowRunId:$workflowRunId,workflowUrl:$workflowUrl}' \
             > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -185,10 +206,8 @@ jobs:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
           CALLBACK_URL: ${{ inputs.callback_url }}
         run: |
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"status":"validating"}' "$CALLBACK_URL"
+          printf '{"status":"validating"}' > callback.json
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
       - name: Enforce the Darwin repository policy
         id: policy
@@ -259,10 +278,8 @@ jobs:
             --rawfile finalMessage .darwin/codex-output.md \
             '{status:$status,headSha:$headSha,pullRequestNumber:$pullRequestNumber,pullRequestUrl:$pullRequestUrl,changedFiles:$changedFiles,checks:$checks,patch:$patch,codex:{threadId:null,finalMessage:$finalMessage,inputTokens:null,cachedInputTokens:null,outputTokens:null}}' \
             > .darwin/callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @.darwin/callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/callback.json
 
       - name: Build the pull request preview
         env:
@@ -285,6 +302,7 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -331,17 +349,16 @@ jobs:
             --arg status preview_ready \
             --arg previewUrl "${PREVIEW_URL}/?study=true" \
             '{status:$status,previewUrl:$previewUrl}' > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
   report_failure:
     needs: [prepare, generate_patch, open_pull_request, deploy_preview]
     if: ${{ always() && failure() }}
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v5
       - name: Report workflow failure to Darwin
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
@@ -352,7 +369,4 @@ jobs:
             --arg status failed \
             --arg error "GitHub Actions run failed. Inspect $WORKFLOW_URL for the real logs." \
             '{status:$status,error:$error}' > callback.json
-          curl --fail-with-body --retry 3 -X POST \
-            -H "Authorization: Bearer $CALLBACK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @callback.json "$CALLBACK_URL"
+          .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
