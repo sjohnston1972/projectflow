@@ -372,6 +372,30 @@ button {
 
 .my-work-panel {
   margin-top: 24px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.my-work-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e7ebed;
+}
+
+.my-work-toolbar .button-secondary {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.my-work-results {
+  padding: 9px 18px;
+  color: #78858b;
+  background: #f7f9f9;
+  border-bottom: 1px solid #e7ebed;
+  font-size: 9px;
 }
 
 .my-work-list > button {
@@ -391,6 +415,26 @@ button {
 
 .my-work-list > button:hover {
   background: #f7faf9;
+}
+
+.my-work-empty {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 24px;
+  color: #849096;
+  text-align: center;
+}
+
+.my-work-empty strong {
+  color: #46535a;
+  font-size: 11px;
+}
+
+.my-work-empty span {
+  font-size: 9px;
 }
 
 .page-heading {
@@ -475,6 +519,22 @@ button {
   background: #fff;
   border: 1px solid #dfe4e7;
   border-radius: 7px;
+  color: inherit;
+  text-align: left;
+}
+
+.metric-actionable {
+  cursor: pointer;
+}
+
+.metric-actionable:hover {
+  border-color: #aebbc0;
+  box-shadow: 0 5px 14px rgb(25 39 47 / 8%);
+}
+
+.metric-actionable:focus-visible {
+  outline: 3px solid rgb(75 150 121 / 28%);
+  outline-offset: 2px;
 }
 
 .metric::before {
@@ -1480,6 +1540,43 @@ button {
   padding-top: 5px;
 }
 
+.task-detail-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 8px 18px;
+}
+
+.task-detail-fields > div {
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f2;
+}
+
+.task-detail-fields > div:nth-child(even) {
+  padding-left: 18px;
+}
+
+.task-detail-fields dt {
+  margin-bottom: 4px;
+  color: #849096;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.task-detail-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #2d3940;
+  font-size: 11px;
+}
+
+.task-detail-actions {
+  padding: 12px 18px 18px;
+}
+
 .nav-scrim {
   display: none;
 }
@@ -1616,6 +1713,19 @@ button {
 
   .my-work-list > button {
     grid-template-columns: 50px minmax(0, 1fr) 16px;
+  }
+
+  .my-work-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-detail-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .task-detail-fields > div:nth-child(even) {
+    padding-left: 0;
   }
 
   .my-work-list .due-date {

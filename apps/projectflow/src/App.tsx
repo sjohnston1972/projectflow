@@ -127,6 +127,8 @@ export function App() {
   );
   const [projectQuery, setProjectQuery] = useState("");
   const [taskQuery, setTaskQuery] = useState("");
+  const [myWorkQuery, setMyWorkQuery] = useState("");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [studyMode, setStudyMode] = useState(
@@ -141,6 +143,7 @@ export function App() {
     [runtime.studyId],
   );
   const telemetryRef = useRef<DarwinTelemetryClient | null>(null);
+  const taskTriggerRef = useRef<HTMLButtonElement | null>(null);
   const captureCompletedRef = useRef(false);
   const historyIndexRef = useRef(0);
   const currentViewRef = useRef({
@@ -269,6 +272,19 @@ export function App() {
       .includes(taskQuery.toLowerCase()),
   );
   const myTasks = tasks.filter((task) => task.assignee === participantName);
+  const normalizedMyWorkQuery = myWorkQuery.trim().toLowerCase();
+  const visibleMyTasks = myTasks.filter((task) => {
+    const projectName =
+      projects.find((project) => project.id === task.projectId)?.name ?? "";
+    return [
+      task.title,
+      task.id,
+      projectName,
+      task.assignee,
+      task.status,
+      task.dueDate,
+    ].some((value) => value.toLowerCase().includes(normalizedMyWorkQuery));
+  });
 
   const navigate = (nextRoute: AppRoute, projectId?: string) => {
     const nextProjectId = projectId ?? null;
@@ -300,6 +316,19 @@ export function App() {
   };
 
   const openProject = (projectId: string) => navigate("project", projectId);
+
+  const openTask = (task: Task, trigger: HTMLButtonElement) => {
+    taskTriggerRef.current = trigger;
+    setSelectedTask(task);
+    if (task.title === "Confirm launch checklist") {
+      markSatisfied("find-assigned-task");
+    }
+  };
+
+  const closeTaskDetail = () => {
+    setSelectedTask(null);
+    taskTriggerRef.current?.focus();
+  };
 
   const markSatisfied = (taskId: string) => {
     if (
@@ -439,6 +468,14 @@ export function App() {
             onClick={() => navigate("dashboard")}
           />
           <NavItem
+            active={route === "my-work"}
+            count={myTasks.length}
+            icon={ListChecks}
+            id="nav-my-work"
+            label="My Work"
+            onClick={() => navigate("my-work")}
+          />
+          <NavItem
             active={route === "projects" || route.startsWith("project")}
             count={projects.length}
             icon={FolderKanban}
@@ -528,6 +565,7 @@ export function App() {
               onOpenProjectTasks={(projectId) =>
                 navigate("project-tasks", projectId)
               }
+              onOpenProjects={() => navigate("projects")}
               onOpenReports={() => navigate("reports")}
               onOpenWork={() => navigate("my-work")}
             />
@@ -544,12 +582,11 @@ export function App() {
           )}
           {route === "my-work" && (
             <MyWork
-              tasks={myTasks}
-              onOpenTask={(task) => {
-                if (task.title === "Confirm launch checklist") {
-                  markSatisfied("find-assigned-task");
-                }
-              }}
+              allTaskCount={myTasks.length}
+              onChangeQuery={setMyWorkQuery}
+              onOpenTask={openTask}
+              query={myWorkQuery}
+              tasks={visibleMyTasks}
             />
           )}
           {route === "project" && selectedProject && (
@@ -566,11 +603,7 @@ export function App() {
               tasks={visibleTasks}
               onChangeQuery={setTaskQuery}
               onCreate={() => setShowTaskForm(true)}
-              onOpenTask={(task) => {
-                if (task.title === "Confirm launch checklist") {
-                  markSatisfied("find-assigned-task");
-                }
-              }}
+              onOpenTask={openTask}
               onSearch={submitTaskSearch}
             />
           )}
@@ -661,6 +694,17 @@ export function App() {
           </form>
         </Modal>
       )}
+
+      {selectedTask && (
+        <TaskDetailDialog
+          onClose={closeTaskDetail}
+          projectName={
+            projects.find((project) => project.id === selectedTask.projectId)
+              ?.name ?? "Unknown project"
+          }
+          task={selectedTask}
+        />
+      )}
     </div>
   );
 }
@@ -684,6 +728,7 @@ function NavItem({
     <button
       className={`nav-item ${active ? "is-active" : ""}`}
       type="button"
+      aria-current={active ? "page" : undefined}
       data-darwin-id={id}
       onClick={onClick}
     >
@@ -699,6 +744,7 @@ function Dashboard({
   tasks,
   onOpenProject,
   onOpenProjectTasks,
+  onOpenProjects,
   onOpenReports,
   onOpenWork,
 }: {
@@ -706,6 +752,7 @@ function Dashboard({
   tasks: Task[];
   onOpenProject: (id: string) => void;
   onOpenProjectTasks: (id: string) => void;
+  onOpenProjects: () => void;
   onOpenReports: () => void;
   onOpenWork: () => void;
 }) {
@@ -723,18 +770,21 @@ function Dashboard({
           value={projects.length}
           meta="2 need attention"
           tone="blue"
+          onActivate={onOpenProjects}
         />
         <Metric
           label="Open tasks"
           value={tasks.filter((task) => task.status !== "Done").length}
           meta="4 due this week"
           tone="green"
+          onActivate={onOpenWork}
         />
         <Metric
           label="My workload"
           value={assigned.length}
           meta="Across 2 projects"
           tone="amber"
+          onActivate={onOpenWork}
         />
         <Metric
           label="Team velocity"
@@ -850,11 +900,17 @@ function Dashboard({
 }
 
 function MyWork({
+  allTaskCount,
+  onChangeQuery,
   tasks,
   onOpenTask,
+  query,
 }: {
+  allTaskCount: number;
+  onChangeQuery: (query: string) => void;
   tasks: Task[];
-  onOpenTask: (task: Task) => void;
+  onOpenTask: (task: Task, trigger: HTMLButtonElement) => void;
+  query: string;
 }) {
   return (
     <>
@@ -864,14 +920,36 @@ function MyWork({
         description="Priorities across every active project, in one place."
       />
       <section className="panel my-work-panel">
-        <PanelHeading title="Assigned tasks" meta={`${tasks.length} visible`} />
+        <div className="my-work-toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              aria-label="Search My Work"
+              value={query}
+              onChange={(event) => onChangeQuery(event.target.value)}
+              placeholder="Search assigned tasks"
+            />
+          </label>
+          {query && (
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={() => onChangeQuery("")}
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+        <div className="my-work-results" role="status" aria-live="polite">
+          {tasks.length} of {allTaskCount} assigned tasks
+        </div>
         <div className="my-work-list">
           {tasks.map((task) => (
             <button
               key={task.id}
               type="button"
               data-darwin-id={`my-work-task-${task.id.toLowerCase()}`}
-              onClick={() => onOpenTask(task)}
+              onClick={(event) => onOpenTask(task, event.currentTarget)}
             >
               <span className="project-code">{task.id}</span>
               <span className="list-main">
@@ -882,6 +960,13 @@ function MyWork({
               <ChevronRight size={16} />
             </button>
           ))}
+          {tasks.length === 0 && (
+            <div className="my-work-empty">
+              <Search size={20} />
+              <strong>No assigned tasks match your search.</strong>
+              <span>Try another title, project, assignee, status, or date.</span>
+            </div>
+          )}
         </div>
       </section>
     </>
@@ -1061,7 +1146,7 @@ function ProjectTasks({
   query: string;
   onChangeQuery: (query: string) => void;
   onCreate: () => void;
-  onOpenTask: (task: Task) => void;
+  onOpenTask: (task: Task, trigger: HTMLButtonElement) => void;
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -1103,7 +1188,7 @@ function ProjectTasks({
               key={task.id}
               type="button"
               data-darwin-id={`task-open-${task.id.toLowerCase()}`}
-              onClick={() => onOpenTask(task)}
+              onClick={(event) => onOpenTask(task, event.currentTarget)}
             >
               <span className="task-check" />
               <span className="list-main">
@@ -1408,6 +1493,83 @@ function Modal({
   );
 }
 
+function TaskDetailDialog({
+  onClose,
+  projectName,
+  task,
+}: {
+  onClose: () => void;
+  projectName: string;
+  task: Task;
+}) {
+  useEffect(() => {
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => document.removeEventListener("keydown", dismissOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="modal task-detail"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-detail-title"
+      >
+        <header>
+          <h2 id="task-detail-title">{task.title}</h2>
+          <button
+            autoFocus
+            type="button"
+            className="icon-button"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
+        </header>
+        <dl className="task-detail-fields">
+          <div>
+            <dt>Title</dt>
+            <dd>{task.title}</dd>
+          </div>
+          <div>
+            <dt>Task ID</dt>
+            <dd>{task.id}</dd>
+          </div>
+          <div>
+            <dt>Project</dt>
+            <dd>{projectName}</dd>
+          </div>
+          <div>
+            <dt>Assignee</dt>
+            <dd>{task.assignee}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{task.status}</dd>
+          </div>
+          <div>
+            <dt>Due date</dt>
+            <dd>{task.dueDate}</dd>
+          </div>
+        </dl>
+        <div className="modal-actions task-detail-actions">
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={onClose}
+          >
+            Close details
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function PageHeading({
   action,
   description,
@@ -1434,22 +1596,44 @@ function PageHeading({
 function Metric({
   label,
   meta,
+  onActivate,
   tone,
   value,
 }: {
   label: string;
   meta: string;
+  onActivate?: () => void;
   tone: string;
   value: number | string;
 }) {
-  return (
-    <section
-      className={`metric metric-${tone}`}
-      data-darwin-id={`metric-${label.toLowerCase().replaceAll(" ", "-")}`}
-    >
+  const content = (
+    <>
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{meta}</small>
+    </>
+  );
+  const darwinId = `metric-${label.toLowerCase().replaceAll(" ", "-")}`;
+
+  if (onActivate) {
+    return (
+      <button
+        className={`metric metric-${tone} metric-actionable`}
+        type="button"
+        data-darwin-id={darwinId}
+        onClick={onActivate}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <section
+      className={`metric metric-${tone}`}
+      data-darwin-id={darwinId}
+    >
+      {content}
     </section>
   );
 }
