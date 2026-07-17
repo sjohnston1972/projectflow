@@ -208,6 +208,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$BRANCH:refs/remotes/origin/$BRANCH" || true
           git switch -c "$BRANCH"
           git commit -m "feat: apply Darwin mutation ${{ inputs.manifest_id }}"
           git push --force-with-lease origin "$BRANCH"
