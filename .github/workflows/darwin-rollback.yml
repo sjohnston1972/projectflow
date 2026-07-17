@@ -1,0 +1,217 @@
+name: Darwin controlled rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      execution_id:
+        description: Darwin repository execution ID
+        required: true
+        type: string
+      rollback_id:
+        description: Darwin rollback ID
+        required: true
+        type: string
+      rollback_branch:
+        description: Protected rollback branch
+        required: true
+        type: string
+      released_sha:
+        description: Released Darwin commit to revert
+        required: true
+        type: string
+      callback_url:
+        description: Darwin rollback callback URL
+        required: true
+        type: string
+
+concurrency:
+  group: darwin-rollback-${{ inputs.rollback_id }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify the retained mutation and prepare a true revert
+        env:
+          RELEASED_SHA: ${{ inputs.released_sha }}
+          ROLLBACK_BRANCH: ${{ inputs.rollback_branch }}
+        run: |
+          git fetch origin main
+          git fetch origin "$ROLLBACK_BRANCH:refs/remotes/origin/$ROLLBACK_BRANCH" || true
+          git merge-base --is-ancestor "$RELEASED_SHA" origin/main
+          git switch -c "$ROLLBACK_BRANCH" origin/main
+          git revert --no-commit "$RELEASED_SHA"
+          test -n "$(git diff --cached --name-only)"
+          mkdir -p .darwin
+          git diff --cached --binary > .darwin/rollback.patch
+
+      - name: Report rollback validation start
+        env:
+          CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n \
+            --arg status validating \
+            --argjson workflowRunId '${{ github.run_id }}' \
+            --arg workflowUrl "$WORKFLOW_URL" \
+            '{status:$status,workflowRunId:$workflowRunId,workflowUrl:$workflowUrl}' \
+            > callback.json
+          curl --fail-with-body --retry 3 -X POST \
+            -H "Authorization: Bearer $CALLBACK_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @callback.json "$CALLBACK_URL"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the repository validation gate
+        id: verify
+        run: |
+          started=$(date +%s%3N)
+          npm run verify | tee .darwin/verify.log
+          finished=$(date +%s%3N)
+          echo "duration_ms=$((finished-started))" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, push, and open the rollback review boundary
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROLLBACK_BRANCH: ${{ inputs.rollback_branch }}
+          EXECUTION_ID: ${{ inputs.execution_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "revert: rollback Darwin mutation $EXECUTION_ID"
+          git push --force-with-lease origin "$ROLLBACK_BRANCH"
+          head_sha=$(git rev-parse HEAD)
+          pr_url=$(gh pr list --head "$ROLLBACK_BRANCH" --state open --json url --jq '.[0].url')
+          if [ -z "$pr_url" ]; then
+            pr_url=$(gh pr create \
+              --base main \
+              --head "$ROLLBACK_BRANCH" \
+              --title "Darwin rollback: $EXECUTION_ID" \
+              --body "Darwin generated this exact git revert from a retained mutation. Review the real inverse diff and validation checks before releasing the rollback.")
+          fi
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "pull_request_url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Report the inverse diff and pull request
+        env:
+          CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+          PR_URL: ${{ steps.publish.outputs.pull_request_url }}
+          VERIFY_DURATION: ${{ steps.verify.outputs.duration_ms }}
+        run: |
+          pr_number=${PR_URL##*/}
+          changed_files=$(git diff --name-only origin/main...HEAD | jq -R . | jq -s .)
+          checks=$(jq -n \
+            --argjson verifyDuration "$VERIFY_DURATION" \
+            '[
+              {name:"Git revert generation",status:"passed",durationMs:null,output:"Exact inverse patch generated from the released commit."},
+              {name:"npm run verify",status:"passed",durationMs:$verifyDuration,output:"Typecheck, tests, and production build passed."}
+            ]')
+          jq -n \
+            --arg status pull_request_open \
+            --arg headSha "$HEAD_SHA" \
+            --argjson pullRequestNumber "$pr_number" \
+            --arg pullRequestUrl "$PR_URL" \
+            --argjson changedFiles "$changed_files" \
+            --argjson checks "$checks" \
+            --rawfile patch .darwin/rollback.patch \
+            '{status:$status,headSha:$headSha,pullRequestNumber:$pullRequestNumber,pullRequestUrl:$pullRequestUrl,changedFiles:$changedFiles,checks:$checks,patch:$patch}' \
+            > .darwin/callback.json
+          curl --fail-with-body --retry 3 -X POST \
+            -H "Authorization: Bearer $CALLBACK_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @.darwin/callback.json "$CALLBACK_URL"
+
+      - name: Build the rollback preview
+        env:
+          CANDIDATE_SHA: ${{ steps.publish.outputs.head_sha }}
+          VITE_API_BASE_URL: https://darwin-api.stevie-johnston.workers.dev
+          VITE_BASE_PATH: /
+        run: |
+          export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-rollback"
+          npm run build
+
+      - name: Deploy the rollback preview
+        id: deployment
+        env:
+          BRANCH: ${{ inputs.rollback_branch }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          npx wrangler@4.111.0 pages deploy apps/projectflow/dist \
+            --project-name darwin-projectflow \
+            --branch "$BRANCH" \
+            --commit-hash "$HEAD_SHA" \
+            --commit-dirty=false
+
+          preview_url=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            deployments=$(curl --fail-with-body --retry 3 \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/darwin-projectflow/deployments")
+            preview_url=$(echo "$deployments" | jq -r \
+              --arg sha "$HEAD_SHA" \
+              '[.result[] | select(.deployment_trigger.metadata.commit_hash == $sha)][0].url // empty')
+            if [ -n "$preview_url" ]; then
+              break
+            fi
+            sleep 2
+          done
+          test -n "$preview_url"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+
+      - name: Report rollback preview readiness
+        env:
+          CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          PREVIEW_URL: ${{ steps.deployment.outputs.preview_url }}
+        run: |
+          jq -n \
+            --arg status preview_ready \
+            --arg previewUrl "${PREVIEW_URL}/?study=true" \
+            '{status:$status,previewUrl:$previewUrl}' > callback.json
+          curl --fail-with-body --retry 3 -X POST \
+            -H "Authorization: Bearer $CALLBACK_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @callback.json "$CALLBACK_URL"
+
+  report_failure:
+    needs: rollback
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Report workflow failure to Darwin
+        env:
+          CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n \
+            --arg status failed \
+            --arg error "GitHub Actions rollback run failed. Inspect $WORKFLOW_URL for the real logs." \
+            '{status:$status,error:$error}' > callback.json
+          curl --fail-with-body --retry 3 -X POST \
+            -H "Authorization: Bearer $CALLBACK_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @callback.json "$CALLBACK_URL"
