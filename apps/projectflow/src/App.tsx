@@ -16,17 +16,17 @@ import {
   Settings,
   Users,
   X,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import {
   createTelemetryClient,
   type DarwinTelemetryClient,
-} from '@darwin/telemetry-client';
+} from "@darwin/telemetry-client";
 import {
   ParticipantWorkspaceResponseSchema,
   type StudyTelemetryEvent,
-} from '@darwin/shared';
+} from "@darwin/shared";
 
 import {
   initialProjects,
@@ -35,11 +35,11 @@ import {
   type AppRoute,
   type Project,
   type Task,
-} from './data';
+} from "./data";
 
-const workspaceKey = 'projectflow:workspace:v1';
-const participantKey = 'projectflow:participant';
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
+const workspaceKey = "projectflow:workspace:v1";
+const participantKey = "projectflow:participant";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
 
 interface Workspace {
   projects: Project[];
@@ -53,24 +53,24 @@ interface ProjectFlowHistoryState {
 }
 
 const appRoutes: readonly AppRoute[] = [
-  'dashboard',
-  'my-work',
-  'projects',
-  'project',
-  'project-tasks',
-  'reports',
-  'settings',
+  "dashboard",
+  "my-work",
+  "projects",
+  "project",
+  "project-tasks",
+  "reports",
+  "settings",
 ];
 
 const historyStateOf = (value: unknown): ProjectFlowHistoryState | null => {
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== "object") return null;
   const state = (value as { projectFlow?: Partial<ProjectFlowHistoryState> })
     .projectFlow;
   if (
     !state ||
-    typeof state.index !== 'number' ||
+    typeof state.index !== "number" ||
     !appRoutes.includes(state.route as AppRoute) ||
-    (state.projectId !== null && typeof state.projectId !== 'string')
+    (state.projectId !== null && typeof state.projectId !== "string")
   ) {
     return null;
   }
@@ -96,9 +96,9 @@ const getParticipantId = (key = participantKey) => {
 };
 
 const routePath = (route: AppRoute, projectId?: string) => {
-  if (route === 'project') return `/projects/${projectId ?? 'unknown'}`;
-  if (route === 'project-tasks') {
-    return `/projects/${projectId ?? 'unknown'}/tasks`;
+  if (route === "project") return `/projects/${projectId ?? "unknown"}`;
+  if (route === "project-tasks") {
+    return `/projects/${projectId ?? "unknown"}/tasks`;
   }
   return `/${route}`;
 };
@@ -107,13 +107,13 @@ export function App() {
   const runtime = useMemo(() => {
     const parameters = new URLSearchParams(window.location.search);
     const source =
-      parameters.get('source') === 'automated' ? 'automated' : 'real_user';
-    const appVersion = import.meta.env.VITE_APP_VERSION || 'baseline';
+      parameters.get("source") === "automated" ? "automated" : "real_user";
+    const appVersion = import.meta.env.VITE_APP_VERSION || "baseline";
     const studyId =
       import.meta.env.VITE_STUDY_ID ||
-      (source === 'automated'
-        ? 'projectflow-baseline-automated-study'
-        : 'projectflow-baseline-study');
+      (source === "automated"
+        ? "projectflow-baseline-automated-study"
+        : "projectflow-baseline-study");
     return {
       appVersion,
       source,
@@ -121,16 +121,18 @@ export function App() {
     } as const;
   }, []);
   const [{ projects, tasks }, setWorkspace] = useState(loadWorkspace);
-  const [route, setRoute] = useState<AppRoute>('dashboard');
+  const [route, setRoute] = useState<AppRoute>("dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   );
-  const [projectQuery, setProjectQuery] = useState('');
-  const [taskQuery, setTaskQuery] = useState('');
+  const [projectQuery, setProjectQuery] = useState("");
+  const [taskQuery, setTaskQuery] = useState("");
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [studyMode, setStudyMode] = useState(() =>
-    window.location.pathname.startsWith('/study'),
+  const [studyMode, setStudyMode] = useState(
+    () =>
+      window.location.pathname.endsWith("/study") ||
+      new URLSearchParams(window.location.search).get("study") === "true",
   );
   const [events, setEvents] = useState<StudyTelemetryEvent[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -142,19 +144,19 @@ export function App() {
   const captureCompletedRef = useRef(false);
   const historyIndexRef = useRef(0);
   const currentViewRef = useRef({
-    route: 'dashboard' as AppRoute,
+    route: "dashboard" as AppRoute,
     projectId: null as string | null,
   });
 
   useEffect(() => {
     localStorage.setItem(workspaceKey, JSON.stringify({ projects, tasks }));
-    if (import.meta.env.MODE === 'test') return;
+    if (import.meta.env.MODE === "test") return;
     const timeout = window.setTimeout(() => {
       void fetch(
         `${apiBaseUrl}/api/studies/${runtime.studyId}/participants/${participantId}/workspace`,
         {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             projects,
             tasks,
@@ -167,7 +169,7 @@ export function App() {
   }, [participantId, projects, runtime.studyId, tasks]);
 
   useEffect(() => {
-    if (import.meta.env.MODE === 'test') return;
+    if (import.meta.env.MODE === "test") return;
     const controller = new AbortController();
     void fetch(
       `${apiBaseUrl}/api/studies/${runtime.studyId}/participants/${participantId}/workspace`,
@@ -195,9 +197,9 @@ export function App() {
       studyId: runtime.studyId,
       participantId,
       source: runtime.source,
-      initialRoute: studyMode ? '/study/dashboard' : '/dashboard',
+      initialRoute: studyMode ? "/study/dashboard" : "/dashboard",
       endpoint:
-        import.meta.env.MODE === 'test'
+        import.meta.env.MODE === "test"
           ? undefined
           : import.meta.env.VITE_TELEMETRY_ENDPOINT ||
             `${apiBaseUrl}/api/telemetry/events`,
@@ -206,7 +208,7 @@ export function App() {
     telemetryRef.current = telemetry;
     captureCompletedRef.current = false;
     telemetry.init();
-    if (studyMode) telemetry.taskStarted('find-assigned-task');
+    if (studyMode) telemetry.taskStarted("find-assigned-task");
     return () => {
       telemetry.destroy();
       telemetryRef.current = null;
@@ -221,7 +223,7 @@ export function App() {
     };
     window.history.replaceState(
       { ...window.history.state, projectFlow: currentState },
-      '',
+      "",
       window.location.href,
     );
 
@@ -229,11 +231,11 @@ export function App() {
       const next = historyStateOf(event.state);
       if (!next) return;
       const previous = currentViewRef.current;
-      const prefix = studyMode ? '/study' : '';
+      const prefix = studyMode ? "/study" : "";
       const fromRoute = `${prefix}${routePath(previous.route, previous.projectId ?? undefined)}`;
       const toRoute = `${prefix}${routePath(next.route, next.projectId ?? undefined)}`;
       telemetryRef.current?.trackBrowserNavigation(
-        next.index < historyIndexRef.current ? 'back' : 'forward',
+        next.index < historyIndexRef.current ? "back" : "forward",
         fromRoute,
         toRoute,
       );
@@ -248,8 +250,8 @@ export function App() {
       telemetryRef.current?.trackRouteChanged(toRoute);
     };
 
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, [studyMode]);
 
   const selectedProject = projects.find(
@@ -284,7 +286,7 @@ export function App() {
     };
     window.history.pushState(
       { ...window.history.state, projectFlow: nextHistoryState },
-      '',
+      "",
       window.location.href,
     );
     historyIndexRef.current = nextHistoryState.index;
@@ -293,33 +295,33 @@ export function App() {
     setSelectedProjectId(nextProjectId);
     setMobileNavOpen(false);
     telemetryRef.current?.trackRouteChanged(
-      `${studyMode ? '/study' : ''}${routePath(nextRoute, projectId)}`,
+      `${studyMode ? "/study" : ""}${routePath(nextRoute, projectId)}`,
     );
   };
 
-  const openProject = (projectId: string) => navigate('project', projectId);
+  const openProject = (projectId: string) => navigate("project", projectId);
 
   const markSatisfied = (taskId: string) => {
     if (
       !studyMode ||
-      taskId !== 'find-assigned-task' ||
+      taskId !== "find-assigned-task" ||
       captureCompletedRef.current
     ) {
       return;
     }
     captureCompletedRef.current = true;
-    telemetryRef.current?.taskCompleted('success');
+    telemetryRef.current?.taskCompleted("success");
   };
 
   const createProject = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const name = String(form.get('name')).trim();
+    const name = String(form.get("name")).trim();
     if (!name) {
       telemetryRef.current?.trackValidationError(
-        'project-create-submit',
-        'project-name',
-        'required',
+        "project-create-submit",
+        "project-name",
+        "required",
       );
       return;
     }
@@ -329,19 +331,19 @@ export function App() {
       code: name
         .split(/\s+/)
         .map((part) => part[0])
-        .join('')
+        .join("")
         .slice(0, 3)
         .toUpperCase(),
       owner: participantName,
-      status: 'On track',
-      dueDate: 'Aug 30',
+      status: "On track",
+      dueDate: "Aug 30",
     };
     setWorkspace((current) => ({
       ...current,
       projects: [project, ...current.projects],
     }));
-    if (name.toLowerCase() === 'polaris launch')
-      markSatisfied('create-project');
+    if (name.toLowerCase() === "polaris launch")
+      markSatisfied("create-project");
     setShowProjectForm(false);
     openProject(project.id);
   };
@@ -350,13 +352,13 @@ export function App() {
     event.preventDefault();
     if (!selectedProject) return;
     const form = new FormData(event.currentTarget);
-    const title = String(form.get('title')).trim();
-    const assignee = String(form.get('assignee'));
+    const title = String(form.get("title")).trim();
+    const assignee = String(form.get("assignee"));
     if (!title) {
       telemetryRef.current?.trackValidationError(
-        'task-create-submit',
-        'task-title',
-        'required',
+        "task-create-submit",
+        "task-title",
+        "required",
       );
       return;
     }
@@ -365,19 +367,19 @@ export function App() {
       projectId: selectedProject.id,
       title,
       assignee,
-      status: 'To do',
-      dueDate: 'Jul 28',
+      status: "To do",
+      dueDate: "Jul 28",
     };
     setWorkspace((current) => ({
       ...current,
       tasks: [task, ...current.tasks],
     }));
     if (
-      selectedProject.id === 'apollo' &&
-      title.toLowerCase() === 'draft rollback plan' &&
+      selectedProject.id === "apollo" &&
+      title.toLowerCase() === "draft rollback plan" &&
       assignee === participantName
     ) {
-      markSatisfied('create-assigned-task');
+      markSatisfied("create-assigned-task");
     }
     setShowTaskForm(false);
   };
@@ -385,7 +387,7 @@ export function App() {
   const submitProjectSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     telemetryRef.current?.trackSearch(
-      'project-search',
+      "project-search",
       projectQuery.length,
       visibleProjects.length,
     );
@@ -394,7 +396,7 @@ export function App() {
   const submitTaskSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     telemetryRef.current?.trackSearch(
-      'project-task-search',
+      "project-task-search",
       taskQuery.length,
       visibleTasks.length,
     );
@@ -408,21 +410,21 @@ export function App() {
     };
     window.history.pushState(
       { ...window.history.state, projectFlow: nextHistoryState },
-      '',
-      '/study',
+      "",
+      `${import.meta.env.BASE_URL}study`,
     );
     historyIndexRef.current = nextHistoryState.index;
     setStudyMode(true);
   };
 
   return (
-    <div className={`app-shell ${studyMode ? 'has-study' : ''}`}>
-      <aside className={`sidebar ${mobileNavOpen ? 'is-open' : ''}`}>
+    <div className={`app-shell ${studyMode ? "has-study" : ""}`}>
+      <aside className={`sidebar ${mobileNavOpen ? "is-open" : ""}`}>
         <button
           className="brand"
           type="button"
           data-darwin-id="brand-home"
-          onClick={() => navigate('dashboard')}
+          onClick={() => navigate("dashboard")}
         >
           <span className="brand-mark">P</span>
           <span>ProjectFlow</span>
@@ -430,33 +432,33 @@ export function App() {
 
         <nav aria-label="Primary navigation">
           <NavItem
-            active={route === 'dashboard'}
+            active={route === "dashboard"}
             icon={LayoutDashboard}
             id="nav-dashboard"
             label="Dashboard"
-            onClick={() => navigate('dashboard')}
+            onClick={() => navigate("dashboard")}
           />
           <NavItem
-            active={route === 'projects' || route.startsWith('project')}
+            active={route === "projects" || route.startsWith("project")}
             count={projects.length}
             icon={FolderKanban}
             id="nav-projects"
             label="Projects"
-            onClick={() => navigate('projects')}
+            onClick={() => navigate("projects")}
           />
           <NavItem
-            active={route === 'reports'}
+            active={route === "reports"}
             icon={FileBarChart}
             id="nav-reports"
             label="Reports"
-            onClick={() => navigate('reports')}
+            onClick={() => navigate("reports")}
           />
           <NavItem
-            active={route === 'settings'}
+            active={route === "settings"}
             icon={Settings}
             id="nav-settings"
             label="Settings"
-            onClick={() => navigate('settings')}
+            onClick={() => navigate("settings")}
           />
         </nav>
 
@@ -518,19 +520,19 @@ export function App() {
         </header>
 
         <main className="content">
-          {route === 'dashboard' && (
+          {route === "dashboard" && (
             <Dashboard
               projects={projects}
               tasks={tasks}
               onOpenProject={openProject}
               onOpenProjectTasks={(projectId) =>
-                navigate('project-tasks', projectId)
+                navigate("project-tasks", projectId)
               }
-              onOpenReports={() => navigate('reports')}
-              onOpenWork={() => navigate('my-work')}
+              onOpenReports={() => navigate("reports")}
+              onOpenWork={() => navigate("my-work")}
             />
           )}
-          {route === 'projects' && (
+          {route === "projects" && (
             <Projects
               projects={visibleProjects}
               query={projectQuery}
@@ -540,24 +542,24 @@ export function App() {
               onSearch={submitProjectSearch}
             />
           )}
-          {route === 'my-work' && (
+          {route === "my-work" && (
             <MyWork
               tasks={myTasks}
               onOpenTask={(task) => {
-                if (task.title === 'Confirm launch checklist') {
-                  markSatisfied('find-assigned-task');
+                if (task.title === "Confirm launch checklist") {
+                  markSatisfied("find-assigned-task");
                 }
               }}
             />
           )}
-          {route === 'project' && selectedProject && (
+          {route === "project" && selectedProject && (
             <ProjectOverview
               project={selectedProject}
               tasks={selectedTasks}
-              onOpenTasks={() => navigate('project-tasks', selectedProject.id)}
+              onOpenTasks={() => navigate("project-tasks", selectedProject.id)}
             />
           )}
-          {route === 'project-tasks' && selectedProject && (
+          {route === "project-tasks" && selectedProject && (
             <ProjectTasks
               project={selectedProject}
               query={taskQuery}
@@ -565,17 +567,17 @@ export function App() {
               onChangeQuery={setTaskQuery}
               onCreate={() => setShowTaskForm(true)}
               onOpenTask={(task) => {
-                if (task.title === 'Confirm launch checklist') {
-                  markSatisfied('find-assigned-task');
+                if (task.title === "Confirm launch checklist") {
+                  markSatisfied("find-assigned-task");
                 }
               }}
               onSearch={submitTaskSearch}
             />
           )}
-          {route === 'reports' && (
+          {route === "reports" && (
             <Reports projects={projects} onOpenProject={openProject} />
           )}
-          {route === 'settings' && <SettingsView />}
+          {route === "settings" && <SettingsView />}
         </main>
       </div>
 
@@ -680,7 +682,7 @@ function NavItem({
 }) {
   return (
     <button
-      className={`nav-item ${active ? 'is-active' : ''}`}
+      className={`nav-item ${active ? "is-active" : ""}`}
       type="button"
       data-darwin-id={id}
       onClick={onClick}
@@ -724,7 +726,7 @@ function Dashboard({
         />
         <Metric
           label="Open tasks"
-          value={tasks.filter((task) => task.status !== 'Done').length}
+          value={tasks.filter((task) => task.status !== "Done").length}
           meta="4 due this week"
           tone="green"
         />
@@ -772,14 +774,14 @@ function Dashboard({
               title="Release notes approved"
               meta="Priya - 18 min ago"
               targetId="activity-release-notes"
-              onOpen={() => onOpenProject('apollo')}
+              onOpen={() => onOpenProject("apollo")}
             />
             <Activity
               color="blue"
               title="Atlas milestone moved"
               meta="Marcus - 2 hours ago"
               targetId="activity-atlas-milestone"
-              onOpen={() => onOpenProject('atlas')}
+              onOpen={() => onOpenProject("atlas")}
             />
             <Activity
               color="amber"
@@ -793,7 +795,7 @@ function Dashboard({
               title="Research summary shared"
               meta="Elena - Yesterday"
               targetId="activity-research-summary"
-              onOpen={() => onOpenProject('retention')}
+              onOpen={() => onOpenProject("retention")}
             />
           </div>
         </section>
@@ -819,7 +821,7 @@ function Dashboard({
             className="upcoming"
             type="button"
             data-darwin-id="upcoming-apollo-code-freeze"
-            onClick={() => onOpenProjectTasks('apollo')}
+            onClick={() => onOpenProjectTasks("apollo")}
           >
             <Clock3 size={17} />
             <span>
@@ -1000,17 +1002,17 @@ function ProjectOverview({
           <PanelHeading title="Delivery progress" meta="Current sprint" />
           <strong>
             {Math.round(
-              (tasks.filter((task) => task.status === 'Done').length /
+              (tasks.filter((task) => task.status === "Done").length /
                 Math.max(1, tasks.length)) *
                 100,
             )}
             %
           </strong>
           <div className="progress-track">
-            <span style={{ width: '42%' }} />
+            <span style={{ width: "42%" }} />
           </div>
           <p>
-            {tasks.filter((task) => task.status === 'Done').length} of{' '}
+            {tasks.filter((task) => task.status === "Done").length} of{" "}
             {tasks.length} tasks completed
           </p>
         </section>
@@ -1128,7 +1130,7 @@ function Reports({
   projects: Project[];
   onOpenProject: (id: string) => void;
 }) {
-  const overdue = projects.filter((project) => project.status === 'Overdue');
+  const overdue = projects.filter((project) => project.status === "Overdue");
   return (
     <>
       <PageHeading
@@ -1143,7 +1145,7 @@ function Reports({
           </div>
           <span>Delivery exception</span>
           <strong>{overdue.length} overdue project</strong>
-          <p>{overdue.map((project) => project.name).join(', ')}</p>
+          <p>{overdue.map((project) => project.name).join(", ")}</p>
           <button
             type="button"
             data-darwin-id="report-overdue-open"
@@ -1201,74 +1203,74 @@ function SettingsView() {
 }
 
 function presentTelemetryEvent(event: StudyTelemetryEvent) {
-  const target = 'targetId' in event ? event.targetId : undefined;
+  const target = "targetId" in event ? event.targetId : undefined;
   const at = target ?? event.route;
   switch (event.eventType) {
-    case 'hover_started':
+    case "hover_started":
       return {
-        label: 'Hover started',
+        label: "Hover started",
         detail: `${at} · ${event.properties.pointerType}`,
         signal: false,
       };
-    case 'hover_ended': {
+    case "hover_ended": {
       const outcome = event.properties.clicked
         ? `clicked after ${formatDuration(event.properties.hoverToClickMs ?? 0)}`
         : event.properties.immediateExit
-          ? 'immediate exit'
-          : 'left without click';
+          ? "immediate exit"
+          : "left without click";
       return {
-        label: 'Hover ended',
+        label: "Hover ended",
         detail: `${at} · ${formatDuration(event.properties.durationMs)} · ${outcome}`,
         signal: !event.properties.clicked && event.properties.durationMs >= 700,
       };
     }
-    case 'element_clicked':
+    case "element_clicked":
       return {
-        label: 'Element clicked',
+        label: "Element clicked",
         detail: event.properties
           ? `${at} · ${event.properties.pointerType} · ${Math.round(event.properties.xRatio * 100)}% x / ${Math.round(event.properties.yRatio * 100)}% y`
           : at,
         signal: event.properties?.interactive === false,
       };
-    case 'pointer_transition':
+    case "pointer_transition":
       return {
-        label: 'Pointer transition',
-        detail: `${event.properties.fromTargetId ?? 'entry'} → ${at} · ${formatDuration(event.properties.elapsedMs)}`,
+        label: "Pointer transition",
+        detail: `${event.properties.fromTargetId ?? "entry"} → ${at} · ${formatDuration(event.properties.elapsedMs)}`,
         signal: false,
       };
-    case 'interaction_signal':
+    case "interaction_signal":
       return {
-        label: event.properties.signal.replaceAll('_', ' '),
+        label: event.properties.signal.replaceAll("_", " "),
         detail: `${at} · ${event.properties.count} observations / ${formatDuration(event.properties.windowMs)}`,
         signal: true,
       };
-    case 'drag_attempted':
+    case "drag_attempted":
       return {
-        label: 'Drag intent',
-        detail: `${at} · ${event.properties.distancePx}px · ${event.properties.draggable ? 'draggable' : 'unsupported'}`,
+        label: "Drag intent",
+        detail: `${at} · ${event.properties.distancePx}px · ${event.properties.draggable ? "draggable" : "unsupported"}`,
         signal: !event.properties.draggable,
       };
-    case 'touch_cancelled':
+    case "touch_cancelled":
       return {
-        label: 'Touch cancelled',
+        label: "Touch cancelled",
         detail: `${at} · after ${formatDuration(event.properties.durationMs)}`,
         signal: true,
       };
-    case 'browser_navigation':
+    case "browser_navigation":
       return {
         label: `Browser ${event.properties.direction}`,
         detail: `${event.properties.fromRoute} → ${event.properties.toRoute}`,
-        signal: event.properties.direction === 'back',
+        signal: event.properties.direction === "back",
       };
-    case 'viewport_zoom_changed':
+    case "viewport_zoom_changed":
       return {
-        label: 'Browser zoom changed',
+        label: "Browser zoom changed",
         detail: `${Math.round(event.properties.fromScale * 100)}% → ${Math.round(event.properties.toScale * 100)}%`,
         signal: event.properties.toScale > event.properties.fromScale,
       };
     default:
       return {
-        label: event.eventType.replaceAll('_', ' '),
+        label: event.eventType.replaceAll("_", " "),
         detail: at,
         signal: false,
       };
@@ -1291,20 +1293,20 @@ function StudyPanel({
 }) {
   const behavioralSignals = events.filter((event) =>
     [
-      'hover_ended',
-      'interaction_signal',
-      'drag_attempted',
-      'touch_cancelled',
-      'browser_navigation',
-      'viewport_zoom_changed',
+      "hover_ended",
+      "interaction_signal",
+      "drag_attempted",
+      "touch_cancelled",
+      "browser_navigation",
+      "viewport_zoom_changed",
     ].includes(event.eventType),
   ).length;
   const pointerTypes = [
     ...new Set(
       events.flatMap((event) =>
-        'properties' in event &&
+        "properties" in event &&
         event.properties &&
-        'pointerType' in event.properties
+        "pointerType" in event.properties
           ? [event.properties.pointerType]
           : [],
       ),
@@ -1317,13 +1319,11 @@ function StudyPanel({
           <span className="live-dot" /> Live telemetry
         </div>
         <strong>
-          {participantId.replace('participant-', 'P-').toUpperCase()}
+          {participantId.replace("participant-", "P-").toUpperCase()}
         </strong>
       </header>
       <div className="study-intro">
-        <span>
-          ProjectFlow - {version}
-        </span>
+        <span>ProjectFlow - {version}</span>
         <h2>Session evidence</h2>
         <p>
           Interact with ProjectFlow normally. Darwin records semantic behavior,
@@ -1344,7 +1344,7 @@ function StudyPanel({
             <span>behavior signals</span>
           </div>
           <div>
-            <strong>{pointerTypes.join(' + ') || 'none'}</strong>
+            <strong>{pointerTypes.join(" + ") || "none"}</strong>
             <span>pointer input</span>
           </div>
         </div>
@@ -1354,10 +1354,10 @@ function StudyPanel({
               const presentation = presentTelemetryEvent(event);
               return (
                 <div
-                  className={`live-event-row ${presentation.signal ? 'is-signal' : ''}`}
+                  className={`live-event-row ${presentation.signal ? "is-signal" : ""}`}
                   key={event.eventId}
                 >
-                  <code>{event.sequence.toString().padStart(2, '0')}</code>
+                  <code>{event.sequence.toString().padStart(2, "0")}</code>
                   <div>
                     <strong>{presentation.label}</strong>
                     <span>{presentation.detail}</span>
@@ -1445,7 +1445,7 @@ function Metric({
   return (
     <section
       className={`metric metric-${tone}`}
-      data-darwin-id={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}
+      data-darwin-id={`metric-${label.toLowerCase().replaceAll(" ", "-")}`}
     >
       <span>{label}</span>
       <strong>{value}</strong>
@@ -1458,7 +1458,7 @@ function PanelHeading({ meta, title }: { meta?: string; title: string }) {
   return (
     <header
       className="panel-heading"
-      data-darwin-id={`panel-heading-${title.toLowerCase().replaceAll(' ', '-')}`}
+      data-darwin-id={`panel-heading-${title.toLowerCase().replaceAll(" ", "-")}`}
     >
       <h2>{title}</h2>
       {meta && <span>{meta}</span>}
@@ -1466,9 +1466,9 @@ function PanelHeading({ meta, title }: { meta?: string; title: string }) {
   );
 }
 
-function Status({ value }: { value: Project['status'] }) {
+function Status({ value }: { value: Project["status"] }) {
   return (
-    <span className={`status status-${value.toLowerCase().replace(' ', '-')}`}>
+    <span className={`status status-${value.toLowerCase().replace(" ", "-")}`}>
       {value}
     </span>
   );
@@ -1505,8 +1505,8 @@ function Activity({
 }
 
 function routeTitle(route: AppRoute, project?: Project) {
-  if (route === 'my-work') return 'My Work';
-  if (route === 'project') return project?.name ?? 'Project';
-  if (route === 'project-tasks') return `${project?.name ?? 'Project'} tasks`;
+  if (route === "my-work") return "My Work";
+  if (route === "project") return project?.name ?? "Project";
+  if (route === "project-tasks") return `${project?.name ?? "Project"} tasks`;
   return route[0]?.toUpperCase() + route.slice(1);
 }

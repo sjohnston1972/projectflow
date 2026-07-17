@@ -29,8 +29,8 @@ jobs:
           cache: npm
       - name: Restore the measured baseline genome
         run: |
-          git fetch --force origin refs/tags/demo-baseline:refs/tags/demo-baseline
-          git restore --source demo-baseline -- \
+          git fetch --force origin refs/tags/demo-baseline-v2:refs/tags/demo-baseline-v2
+          git restore --source demo-baseline-v2 -- \
             apps/projectflow/src/App.tsx \
             apps/projectflow/src/App.test.tsx \
             apps/projectflow/src/data.ts \

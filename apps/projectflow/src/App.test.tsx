@@ -1,73 +1,85 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { App } from './App';
+import { App } from "./App";
 
-describe('standalone ProjectFlow', () => {
-  it('explains the product on the default dashboard', () => {
+describe("standalone ProjectFlow", () => {
+  it("explains the product on the default dashboard", () => {
     render(<App />);
 
     expect(
       screen.getByText(
-        'ProjectFlow is a task management platform for creating projects, assigning tasks, and coordinating work with project members.',
+        "ProjectFlow is a task management platform for creating projects, assigning tasks, and coordinating work with project members.",
       ),
     ).toBeVisible();
   });
 
   beforeEach(() => {
     localStorage.clear();
-    window.history.replaceState({}, '', '/');
+    window.history.replaceState({}, "", "/");
   });
 
   afterEach(() => {
     document.body.replaceChildren();
   });
 
-  it('creates and persists a functional project', () => {
+  it("creates and persists a functional project", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Projects/ }));
-    fireEvent.click(screen.getByRole('button', { name: /New project/ }));
-    fireEvent.change(screen.getByLabelText('Project name'), {
-      target: { value: 'Polaris Launch' },
+    fireEvent.click(screen.getByRole("button", { name: /Projects/ }));
+    fireEvent.click(screen.getByRole("button", { name: /New project/ }));
+    fireEvent.change(screen.getByLabelText("Project name"), {
+      target: { value: "Polaris Launch" },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     expect(
-      screen.getByRole('heading', { name: 'Polaris Launch' }),
+      screen.getByRole("heading", { name: "Polaris Launch" }),
     ).toBeInTheDocument();
-    expect(localStorage.getItem('projectflow:workspace:v1')).toContain(
-      'Polaris Launch',
+    expect(localStorage.getItem("projectflow:workspace:v1")).toContain(
+      "Polaris Launch",
     );
   });
 
-  it('records a verified study attempt through the indirect task path', () => {
-    window.history.replaceState({}, '', '/study');
+  it("records a verified study attempt through the indirect task path", () => {
+    window.history.replaceState({}, "", "/study");
     render(<App />);
 
     expect(
-      screen.queryByRole('button', { name: /^Tasks/ }),
+      screen.queryByRole("button", { name: /^Tasks/ }),
     ).not.toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', { name: 'Session evidence' }),
+      screen.getByRole("heading", { name: "Session evidence" }),
     ).toBeVisible();
-    expect(screen.queryByText('Complete three tasks')).not.toBeInTheDocument();
-    expect(screen.queryByText('Optional feedback')).not.toBeInTheDocument();
+    expect(screen.queryByText("Complete three tasks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Optional feedback")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Projects/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Apollo Release/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Tasks/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Projects/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Apollo Release/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tasks/ }));
     fireEvent.click(
-      screen.getByRole('button', { name: /Confirm launch checklist/ }),
+      screen.getByRole("button", { name: /Confirm launch checklist/ }),
     );
 
-    expect(screen.getByText('task completed')).toBeInTheDocument();
+    expect(screen.getByText("task completed")).toBeInTheDocument();
     expect(screen.getByText(/events/)).toBeInTheDocument();
   });
 
-  it('retains more than 40 events in the session evidence stream', () => {
-    window.history.replaceState({}, '', '/study');
+  it("enters measured study mode from a GitHub Pages query URL", () => {
+    window.history.replaceState({}, "", "/projectflow/?study=true");
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Session evidence" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Study mode" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retains more than 40 events in the session evidence stream", () => {
+    window.history.replaceState({}, "", "/study");
     const { container } = render(<App />);
     const metric = container.querySelector<HTMLElement>(
       '[data-darwin-id="metric-open-tasks"]',
@@ -79,17 +91,17 @@ describe('standalone ProjectFlow', () => {
     }
 
     const eventCount = Number.parseInt(
-      screen.getByLabelText('Captured events').textContent ?? '0',
+      screen.getByLabelText("Captured events").textContent ?? "0",
       10,
     );
     expect(eventCount).toBeGreaterThan(40);
-    expect(container.querySelectorAll('.live-event-row')).toHaveLength(
+    expect(container.querySelectorAll(".live-event-row")).toHaveLength(
       eventCount,
     );
   });
 
-  it('makes dashboard activity, capacity, and upcoming tiles actionable', () => {
-    window.history.replaceState({}, '', '/study');
+  it("makes dashboard activity, capacity, and upcoming tiles actionable", () => {
+    window.history.replaceState({}, "", "/study");
     const { container } = render(<App />);
 
     expect(
@@ -109,23 +121,23 @@ describe('standalone ProjectFlow', () => {
     ).not.toBeNull();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /Release notes approved/ }),
+      screen.getByRole("button", { name: /Release notes approved/ }),
     );
     expect(
-      screen.getByRole('heading', { name: 'Apollo Release' }),
+      screen.getByRole("heading", { name: "Apollo Release" }),
     ).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: /Dashboard/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Team member 1, 44% allocated' }),
+      screen.getByRole("button", { name: "Team member 1, 44% allocated" }),
     );
-    expect(screen.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Reports" })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: /Dashboard/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Apollo code freeze/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Apollo code freeze/ }));
     expect(
-      screen.getByRole('heading', { name: 'Apollo Release' }),
+      screen.getByRole("heading", { name: "Apollo Release" }),
     ).toBeVisible();
-    expect(screen.getByLabelText('Search project tasks')).toBeVisible();
+    expect(screen.getByLabelText("Search project tasks")).toBeVisible();
   });
 });
