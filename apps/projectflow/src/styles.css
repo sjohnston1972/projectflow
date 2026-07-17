@@ -205,34 +205,6 @@ button {
   font-size: 11px;
 }
 
-.breadcrumb-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.breadcrumb button {
-  padding: 2px;
-  color: #68777f;
-  background: transparent;
-  border: 0;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: inherit;
-}
-
-.breadcrumb button:hover {
-  color: #245f4c;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.breadcrumb button:focus-visible {
-  color: #245f4c;
-  outline: 2px solid #73b89e;
-  outline-offset: 2px;
-}
-
 .breadcrumb strong {
   overflow: hidden;
   color: #39444b;
@@ -421,12 +393,6 @@ button {
   background: #f7faf9;
 }
 
-.my-work-list > button:focus-visible {
-  position: relative;
-  outline: 2px solid #3e8a6e;
-  outline-offset: -2px;
-}
-
 .page-heading {
   display: flex;
   align-items: flex-end;
@@ -509,32 +475,6 @@ button {
   background: #fff;
   border: 1px solid #dfe4e7;
   border-radius: 7px;
-  text-align: left;
-}
-
-.metric-static {
-  cursor: default;
-}
-
-.metric-action {
-  color: inherit;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    transform 120ms ease;
-}
-
-.metric-action:hover {
-  border-color: #9bbcaf;
-  box-shadow: 0 5px 14px rgb(25 72 55 / 9%);
-  transform: translateY(-1px);
-}
-
-.metric-action:focus-visible {
-  border-color: #3e8a6e;
-  box-shadow: 0 0 0 3px rgb(62 138 110 / 20%);
-  outline: 0;
 }
 
 .metric::before {
@@ -640,15 +580,6 @@ button {
   background: #f7f9f9;
 }
 
-.project-health-list > button:focus-visible,
-.task-directory > button:focus-visible,
-.data-table > button:focus-visible {
-  position: relative;
-  background: #f7f9f9;
-  outline: 2px solid #3e8a6e;
-  outline-offset: -2px;
-}
-
 .project-code {
   display: grid;
   width: 31px;
@@ -741,13 +672,6 @@ button {
 .upcoming:hover strong,
 .upcoming:focus-visible strong {
   color: #24634f;
-}
-
-.activity:focus-visible,
-.upcoming:focus-visible {
-  border-radius: 3px;
-  outline: 2px solid #3e8a6e;
-  outline-offset: 3px;
 }
 
 .activity strong,
