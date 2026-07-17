@@ -101,6 +101,7 @@ export type StudyTaskId = (typeof studyTasks)[number]['id'];
 export type AppRoute =
   | 'dashboard'
   | 'my-work'
+  | 'open-tasks'
   | 'projects'
   | 'project'
   | 'project-tasks'

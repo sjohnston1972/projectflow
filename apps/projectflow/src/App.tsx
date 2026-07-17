@@ -55,6 +55,7 @@ interface ProjectFlowHistoryState {
 const appRoutes: readonly AppRoute[] = [
   "dashboard",
   "my-work",
+  "open-tasks",
   "projects",
   "project",
   "project-tasks",
@@ -269,6 +270,9 @@ export function App() {
       .includes(taskQuery.toLowerCase()),
   );
   const myTasks = tasks.filter((task) => task.assignee === participantName);
+  const openTasks = tasks
+    .filter((task) => task.status !== "Done")
+    .slice(0, 100);
 
   const navigate = (nextRoute: AppRoute, projectId?: string) => {
     const nextProjectId = projectId ?? null;
@@ -491,11 +495,11 @@ export function App() {
           >
             <Menu size={19} />
           </button>
-          <div className="breadcrumb">
-            <span>Northstar Labs</span>
-            <ChevronRight size={14} />
-            <strong>{routeTitle(route, selectedProject)}</strong>
-          </div>
+          <Breadcrumbs
+            route={route}
+            project={selectedProject}
+            onNavigate={navigate}
+          />
           <div className="topbar-actions">
             {!studyMode && (
               <button
@@ -529,6 +533,7 @@ export function App() {
                 navigate("project-tasks", projectId)
               }
               onOpenReports={() => navigate("reports")}
+              onOpenTasks={() => navigate("open-tasks")}
               onOpenWork={() => navigate("my-work")}
             />
           )}
@@ -545,6 +550,24 @@ export function App() {
           {route === "my-work" && (
             <MyWork
               tasks={myTasks}
+              description="Priorities across every active project, in one place."
+              eyebrow="Assigned to Alex Morgan"
+              listTitle="Assigned tasks"
+              title="My Work"
+              onOpenTask={(task) => {
+                if (task.title === "Confirm launch checklist") {
+                  markSatisfied("find-assigned-task");
+                }
+              }}
+            />
+          )}
+          {route === "open-tasks" && (
+            <MyWork
+              tasks={openTasks}
+              description="All work that is still to do or in progress."
+              eyebrow="Across all active projects"
+              listTitle="Open tasks"
+              title="Open Tasks"
               onOpenTask={(task) => {
                 if (task.title === "Confirm launch checklist") {
                   markSatisfied("find-assigned-task");
@@ -700,6 +723,7 @@ function Dashboard({
   onOpenProject,
   onOpenProjectTasks,
   onOpenReports,
+  onOpenTasks,
   onOpenWork,
 }: {
   projects: Project[];
@@ -707,6 +731,7 @@ function Dashboard({
   onOpenProject: (id: string) => void;
   onOpenProjectTasks: (id: string) => void;
   onOpenReports: () => void;
+  onOpenTasks: () => void;
   onOpenWork: () => void;
 }) {
   const assigned = tasks.filter((task) => task.assignee === participantName);
@@ -729,12 +754,14 @@ function Dashboard({
           value={tasks.filter((task) => task.status !== "Done").length}
           meta="4 due this week"
           tone="green"
+          onActivate={onOpenTasks}
         />
         <Metric
           label="My workload"
           value={assigned.length}
           meta="Across 2 projects"
           tone="amber"
+          onActivate={onOpenWork}
         />
         <Metric
           label="Team velocity"
@@ -850,21 +877,29 @@ function Dashboard({
 }
 
 function MyWork({
+  description,
+  eyebrow,
+  listTitle,
   tasks,
+  title,
   onOpenTask,
 }: {
+  description: string;
+  eyebrow: string;
+  listTitle: string;
   tasks: Task[];
+  title: string;
   onOpenTask: (task: Task) => void;
 }) {
   return (
     <>
       <PageHeading
-        eyebrow="Assigned to Alex Morgan"
-        title="My Work"
-        description="Priorities across every active project, in one place."
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
       />
       <section className="panel my-work-panel">
-        <PanelHeading title="Assigned tasks" meta={`${tasks.length} visible`} />
+        <PanelHeading title={listTitle} meta={`${tasks.length} visible`} />
         <div className="my-work-list">
           {tasks.map((task) => (
             <button
@@ -1434,23 +1469,104 @@ function PageHeading({
 function Metric({
   label,
   meta,
+  onActivate,
   tone,
   value,
 }: {
   label: string;
   meta: string;
+  onActivate?: () => void;
   tone: string;
   value: number | string;
 }) {
-  return (
-    <section
-      className={`metric metric-${tone}`}
-      data-darwin-id={`metric-${label.toLowerCase().replaceAll(" ", "-")}`}
-    >
+  const content = (
+    <>
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{meta}</small>
+    </>
+  );
+  const id = `metric-${label.toLowerCase().replaceAll(" ", "-")}`;
+
+  if (onActivate) {
+    return (
+      <button
+        className={`metric metric-action metric-${tone}`}
+        type="button"
+        data-darwin-id={id}
+        onClick={onActivate}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <section
+      className={`metric metric-static metric-${tone}`}
+      data-darwin-id={id}
+    >
+      {content}
     </section>
+  );
+}
+
+function Breadcrumbs({
+  onNavigate,
+  project,
+  route,
+}: {
+  onNavigate: (route: AppRoute, projectId?: string) => void;
+  project?: Project;
+  route: AppRoute;
+}) {
+  const ancestors: Array<{
+    id: string;
+    label: string;
+    projectId?: string;
+    route: AppRoute;
+  }> = [];
+
+  if (route === "project" || route === "project-tasks") {
+    ancestors.push(
+      { id: "breadcrumb-dashboard", label: "Dashboard", route: "dashboard" },
+      { id: "breadcrumb-projects", label: "Projects", route: "projects" },
+    );
+    if (route === "project-tasks" && project) {
+      ancestors.push({
+        id: `breadcrumb-project-${project.id}`,
+        label: project.name,
+        projectId: project.id,
+        route: "project",
+      });
+    }
+  } else if (route !== "dashboard") {
+    ancestors.push({
+      id: "breadcrumb-dashboard",
+      label: "Dashboard",
+      route: "dashboard",
+    });
+  }
+
+  const currentLabel =
+    route === "project-tasks" ? "Tasks" : routeTitle(route, project);
+
+  return (
+    <nav className="breadcrumb" aria-label="Breadcrumb">
+      {ancestors.map((ancestor) => (
+        <span className="breadcrumb-step" key={ancestor.id}>
+          <button
+            type="button"
+            data-darwin-id={ancestor.id}
+            onClick={() => onNavigate(ancestor.route, ancestor.projectId)}
+          >
+            {ancestor.label}
+          </button>
+          <ChevronRight size={14} aria-hidden="true" />
+        </span>
+      ))}
+      <strong aria-current="page">{currentLabel}</strong>
+    </nav>
   );
 }
 
@@ -1506,6 +1622,7 @@ function Activity({
 
 function routeTitle(route: AppRoute, project?: Project) {
   if (route === "my-work") return "My Work";
+  if (route === "open-tasks") return "Open Tasks";
   if (route === "project") return project?.name ?? "Project";
   if (route === "project-tasks") return `${project?.name ?? "Project"} tasks`;
   return route[0]?.toUpperCase() + route.slice(1);
