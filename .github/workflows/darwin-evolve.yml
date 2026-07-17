@@ -267,7 +267,7 @@ jobs:
       - name: Build the pull request preview
         env:
           CANDIDATE_SHA: ${{ steps.publish.outputs.head_sha }}
-          VITE_API_BASE_URL: https://darwin-api.stevie-johnston.workers.dev
+          VITE_API_BASE_URL: /api/darwin
           VITE_BASE_PATH: /
         run: |
           export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-candidate"

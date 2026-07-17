@@ -39,7 +39,8 @@ import {
 
 const workspaceKey = "projectflow:workspace:v1";
 const participantKey = "projectflow:participant";
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8787/api";
 
 interface Workspace {
   projects: Project[];
@@ -153,7 +154,7 @@ export function App() {
     if (import.meta.env.MODE === "test") return;
     const timeout = window.setTimeout(() => {
       void fetch(
-        `${apiBaseUrl}/api/studies/${runtime.studyId}/participants/${participantId}/workspace`,
+        `${apiBaseUrl}/studies/${runtime.studyId}/participants/${participantId}/workspace`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -172,7 +173,7 @@ export function App() {
     if (import.meta.env.MODE === "test") return;
     const controller = new AbortController();
     void fetch(
-      `${apiBaseUrl}/api/studies/${runtime.studyId}/participants/${participantId}/workspace`,
+      `${apiBaseUrl}/studies/${runtime.studyId}/participants/${participantId}/workspace`,
       { signal: controller.signal },
     )
       .then(async (response) => {
@@ -202,7 +203,7 @@ export function App() {
         import.meta.env.MODE === "test"
           ? undefined
           : import.meta.env.VITE_TELEMETRY_ENDPOINT ||
-            `${apiBaseUrl}/api/telemetry/events`,
+            `${apiBaseUrl}/telemetry/events`,
       onEvent: (event) => setEvents((current) => [...current, event]),
     });
     telemetryRef.current = telemetry;
