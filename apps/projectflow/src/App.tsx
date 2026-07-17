@@ -129,10 +129,8 @@ export function App() {
   const [taskQuery, setTaskQuery] = useState('');
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [studyMode, setStudyMode] = useState(
-    () =>
-      window.location.pathname.endsWith('/study') ||
-      new URLSearchParams(window.location.search).get('study') === 'true',
+  const [studyMode, setStudyMode] = useState(() =>
+    window.location.pathname.startsWith('/study'),
   );
   const [events, setEvents] = useState<StudyTelemetryEvent[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -411,7 +409,7 @@ export function App() {
     window.history.pushState(
       { ...window.history.state, projectFlow: nextHistoryState },
       '',
-      `${import.meta.env.BASE_URL}study`,
+      '/study',
     );
     historyIndexRef.current = nextHistoryState.index;
     setStudyMode(true);
