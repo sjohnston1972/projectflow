@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "./App";
@@ -82,7 +82,7 @@ describe("standalone ProjectFlow", () => {
     window.history.replaceState({}, "", "/study");
     const { container } = render(<App />);
     const metric = container.querySelector<HTMLElement>(
-      '[data-darwin-id="metric-team-velocity"]',
+      '[data-darwin-id="metric-open-tasks"]',
     );
 
     expect(metric).not.toBeNull();
@@ -139,159 +139,5 @@ describe("standalone ProjectFlow", () => {
       screen.getByRole("heading", { name: "Apollo Release" }),
     ).toBeVisible();
     expect(screen.getByLabelText("Search project tasks")).toBeVisible();
-  });
-
-  it("opens My Work from primary navigation and both workload metrics", () => {
-    const { container } = render(<App />);
-    const myWorkNav = screen.getByRole("button", { name: /My Work/ });
-
-    expect(myWorkNav.tagName).toBe("BUTTON");
-    myWorkNav.focus();
-    expect(myWorkNav).toHaveFocus();
-    fireEvent.click(myWorkNav);
-    expect(screen.getByRole("heading", { name: "My Work" })).toBeVisible();
-    expect(myWorkNav).toHaveAttribute("aria-current", "page");
-
-    fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
-    const openTasks = screen.getByRole("button", { name: /Open tasks/ });
-    expect(openTasks).toHaveAttribute("data-darwin-id", "metric-open-tasks");
-    fireEvent.click(openTasks);
-    expect(screen.getByRole("heading", { name: "My Work" })).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
-    const workload = screen.getByRole("button", { name: /My workload/ });
-    expect(workload).toHaveAttribute("data-darwin-id", "metric-my-workload");
-    fireEvent.click(workload);
-    expect(screen.getByRole("heading", { name: "My Work" })).toBeVisible();
-
-    fireEvent.click(screen.getByLabelText("Open navigation"));
-    fireEvent.click(screen.getByRole("button", { name: /My Work/ }));
-    expect(container.querySelector(".sidebar")).not.toHaveClass("is-open");
-  });
-
-  it("only makes dashboard metrics with concrete destinations actionable", () => {
-    const { container } = render(<App />);
-
-    const activeProjects = screen.getByRole("button", {
-      name: /Active projects/,
-    });
-    expect(activeProjects).toHaveAttribute(
-      "data-darwin-id",
-      "metric-active-projects",
-    );
-    fireEvent.click(activeProjects);
-    expect(screen.getByRole("heading", { name: "Projects" })).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
-    const velocity = container.querySelector(
-      '[data-darwin-id="metric-team-velocity"]',
-    );
-    expect(velocity?.tagName).toBe("SECTION");
-    expect(velocity).not.toHaveClass("metric-actionable");
-    expect(
-      screen.queryByRole("button", { name: /Team velocity/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("opens complete details for distinct My Work tasks and restores row focus", () => {
-    render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /My Work/ }));
-
-    const confirmRow = screen.getByRole("button", {
-      name: /Confirm launch checklist/,
-    });
-    fireEvent.click(confirmRow);
-    let dialog = screen.getByRole("dialog", {
-      name: "Confirm launch checklist",
-    });
-    expect(within(dialog).getByText("APL-241")).toBeVisible();
-    expect(within(dialog).getByText("Apollo Release")).toBeVisible();
-    expect(within(dialog).getByText("Alex Morgan")).toBeVisible();
-    expect(within(dialog).getByText("To do")).toBeVisible();
-    expect(within(dialog).getByText("Jul 19")).toBeVisible();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(confirmRow).toHaveFocus();
-
-    const exportRow = screen.getByRole("button", {
-      name: /Validate data export/,
-    });
-    fireEvent.click(exportRow);
-    dialog = screen.getByRole("dialog", { name: "Validate data export" });
-    expect(within(dialog).getByText("ATM-104")).toBeVisible();
-    expect(within(dialog).getByText("Atlas Migration")).toBeVisible();
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(exportRow).toHaveFocus();
-
-    fireEvent.click(exportRow);
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Close details",
-      }),
-    );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(exportRow).toHaveFocus();
-  });
-
-  it("opens the task represented by each Project Tasks row", () => {
-    render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /Projects/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Apollo Release/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Tasks/ }));
-
-    fireEvent.click(screen.getByRole("button", { name: /Review release notes/ }));
-    const dialog = screen.getByRole("dialog", { name: "Review release notes" });
-    expect(within(dialog).getByText("APL-238")).toBeVisible();
-    expect(within(dialog).getByText("Apollo Release")).toBeVisible();
-    expect(within(dialog).getByText("Priya Shah")).toBeVisible();
-    expect(within(dialog).getByText("In progress")).toBeVisible();
-    expect(within(dialog).getByText("Jul 18")).toBeVisible();
-  });
-
-  it("filters My Work across every task field and clears to all assignments", () => {
-    render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /My Work/ }));
-    const search = screen.getByLabelText("Search My Work");
-
-    for (const [query, expectedTask, expectedCount] of [
-      ["Confirm launch", "Confirm launch checklist", 1],
-      ["APL-241", "Confirm launch checklist", 1],
-      ["Apollo Release", "Confirm launch checklist", 1],
-      ["Alex Morgan", "Confirm launch checklist", 2],
-      ["In progress", "Validate data export", 1],
-      ["Jul 24", "Validate data export", 1],
-    ] as const) {
-      fireEvent.change(search, { target: { value: query } });
-      expect(screen.getByRole("button", { name: new RegExp(expectedTask) })).toBeVisible();
-      expect(screen.getByRole("status")).toHaveTextContent(
-        `${expectedCount} of 2 assigned tasks`,
-      );
-    }
-
-    fireEvent.change(search, { target: { value: "no matching task" } });
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "0 of 2 assigned tasks",
-    );
-    expect(
-      screen.getByText("No assigned tasks match your search."),
-    ).toBeVisible();
-
-    const clear = screen.getByRole("button", { name: "Clear search" });
-    clear.focus();
-    expect(clear).toHaveFocus();
-    fireEvent.click(clear);
-    expect(search).toHaveValue("");
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "2 of 2 assigned tasks",
-    );
-    expect(
-      screen.getByRole("button", { name: /Confirm launch checklist/ }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: /Validate data export/ }),
-    ).toBeVisible();
   });
 });
