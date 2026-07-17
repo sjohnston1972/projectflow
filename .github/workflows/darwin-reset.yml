@@ -9,10 +9,15 @@ concurrency:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   reset:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -33,18 +38,31 @@ jobs:
       - run: npm ci
       - name: Validate the restored baseline
         run: npm run verify
-      - name: Publish the baseline only when the genome changed
+      - name: Record the restored baseline when the genome changed
         run: |
-          if git diff --quiet; then
-            echo "ProjectFlow is already at the measured baseline."
-            exit 0
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              apps/projectflow/src/App.tsx \
+              apps/projectflow/src/App.test.tsx \
+              apps/projectflow/src/data.ts \
+              apps/projectflow/src/styles.css
+            git commit -m "chore: reset ProjectFlow to measured baseline"
+            git push origin main
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            apps/projectflow/src/App.tsx \
-            apps/projectflow/src/App.test.tsx \
-            apps/projectflow/src/data.ts \
-            apps/projectflow/src/styles.css
-          git commit -m "chore: reset ProjectFlow to measured baseline"
-          git push origin main
+      - name: Build the restored measured target
+        run: |
+          export VITE_APP_VERSION="$(git rev-parse --short=12 HEAD)-baseline"
+          npm run build
+          cp apps/projectflow/dist/index.html apps/projectflow/dist/404.html
+        env:
+          VITE_API_BASE_URL: https://darwin-api.stevie-johnston.workers.dev
+          VITE_BASE_PATH: /projectflow/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/projectflow/dist
+      - name: Deploy the measured baseline
+        id: deployment
+        uses: actions/deploy-pages@v4
