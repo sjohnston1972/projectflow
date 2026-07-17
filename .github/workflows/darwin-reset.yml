@@ -1,0 +1,50 @@
+name: Reset ProjectFlow evolution
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: projectflow-reset
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Restore the measured baseline genome
+        run: |
+          git fetch --force origin refs/tags/demo-baseline:refs/tags/demo-baseline
+          git restore --source demo-baseline -- \
+            apps/projectflow/src/App.tsx \
+            apps/projectflow/src/App.test.tsx \
+            apps/projectflow/src/data.ts \
+            apps/projectflow/src/styles.css
+      - run: npm ci
+      - name: Validate the restored baseline
+        run: npm run verify
+      - name: Publish the baseline only when the genome changed
+        run: |
+          if git diff --quiet; then
+            echo "ProjectFlow is already at the measured baseline."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/projectflow/src/App.tsx \
+            apps/projectflow/src/App.test.tsx \
+            apps/projectflow/src/data.ts \
+            apps/projectflow/src/styles.css
+          git commit -m "chore: reset ProjectFlow to measured baseline"
+          git push origin main
