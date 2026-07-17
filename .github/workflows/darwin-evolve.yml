@@ -48,7 +48,7 @@ jobs:
       base_sha: ${{ steps.bundle.outputs.base_sha }}
       branch: ${{ steps.bundle.outputs.branch }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Fetch the authenticated Darwin manifest
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
@@ -121,7 +121,7 @@ jobs:
             > callback.json
           .github/scripts/darwin-callback.sh POST "$CALLBACK_URL" callback.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: darwin-prepared-${{ inputs.execution_id }}
           path: |
@@ -136,23 +136,23 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ needs.prepare.outputs.base_sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: darwin-prepared-${{ inputs.execution_id }}
           path: .darwin
       - name: Run Codex against the real repository
         id: codex
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: .darwin/prompt.md
@@ -164,7 +164,7 @@ jobs:
         run: |
           git diff --binary HEAD > .darwin/codex.patch
           test -s .darwin/codex.patch
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: darwin-patch-${{ inputs.execution_id }}
           path: |
@@ -184,16 +184,16 @@ jobs:
       head_sha: ${{ steps.publish.outputs.head_sha }}
       pull_request_url: ${{ steps.publish.outputs.pull_request_url }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ needs.prepare.outputs.base_sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: darwin-patch-${{ inputs.execution_id }}
           path: .darwin
@@ -289,7 +289,7 @@ jobs:
         run: |
           export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-candidate"
           npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: projectflow-preview-${{ inputs.execution_id }}
           path: apps/projectflow/dist
@@ -302,11 +302,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: projectflow-preview-${{ inputs.execution_id }}
           path: apps/projectflow/dist
@@ -358,7 +358,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Report workflow failure to Darwin
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}

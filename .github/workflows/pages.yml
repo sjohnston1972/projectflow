@@ -1,8 +1,9 @@
 name: Deploy ProjectFlow to Cloudflare
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [ProjectFlow CI]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -14,10 +15,19 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -37,5 +47,5 @@ jobs:
           npx wrangler@4.111.0 pages deploy apps/projectflow/dist \
             --project-name darwin-projectflow \
             --branch main \
-            --commit-hash "$GITHUB_SHA" \
+            --commit-hash "$TARGET_SHA" \
             --commit-dirty=false
