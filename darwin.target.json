@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "targetId": "projectflow",
+  "name": "ProjectFlow",
+  "purpose": "Task management for creating projects, assigning work, and coordinating delivery.",
+  "defaultBranch": "main",
+  "mutablePaths": [
+    "apps/projectflow/src/App.tsx",
+    "apps/projectflow/src/App.test.tsx",
+    "apps/projectflow/src/data.ts",
+    "apps/projectflow/src/styles.css"
+  ],
+  "protectedPaths": [
+    ".github/workflows",
+    "AGENTS.md",
+    "darwin.target.json",
+    "packages/telemetry-client",
+    "packages/shared"
+  ],
+  "contextPaths": [
+    "README.md",
+    "AGENTS.md",
+    "darwin.target.json",
+    "apps/projectflow/src/App.tsx",
+    "apps/projectflow/src/App.test.tsx",
+    "apps/projectflow/src/data.ts",
+    "apps/projectflow/src/styles.css"
+  ],
+  "validationCommands": [
+    "npm run typecheck",
+    "npm run test",
+    "npm run build"
+  ],
+  "limits": { "maximumChangedFiles": 4, "maximumChangedLines": 1200 }
+}
