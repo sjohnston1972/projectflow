@@ -81,13 +81,12 @@ describe("standalone ProjectFlow", () => {
   it("retains more than 40 events in the session evidence stream", () => {
     window.history.replaceState({}, "", "/study");
     const { container } = render(<App />);
-    const metric = container.querySelector<HTMLElement>(
-      '[data-darwin-id="metric-open-tasks"]',
-    );
 
-    expect(metric).not.toBeNull();
-    for (let click = 0; click < 45; click += 1) {
-      fireEvent.click(metric!);
+    for (let visit = 0; visit < 12; visit += 1) {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Active projects/ }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
     }
 
     const eventCount = Number.parseInt(
@@ -140,4 +139,28 @@ describe("standalone ProjectFlow", () => {
     ).toBeVisible();
     expect(screen.getByLabelText("Search project tasks")).toBeVisible();
   });
+
+  it.each([
+    ["Active projects", "Projects", "metric-active-projects"],
+    ["Open tasks", "My Work", "metric-open-tasks"],
+    ["My workload", "My Work", "metric-my-workload"],
+    ["Team velocity", "Reports", "metric-team-velocity"],
+  ])(
+    "opens the %s metric destination",
+    (metricName, destinationHeading, darwinId) => {
+      const { container } = render(<App />);
+      const metric = screen.getByRole("button", { name: new RegExp(metricName) });
+
+      expect(metric).toHaveAttribute("data-darwin-id", darwinId);
+      expect(container.querySelector(`[data-darwin-id="${darwinId}"]`)).toBe(
+        metric,
+      );
+
+      fireEvent.click(metric);
+
+      expect(
+        screen.getByRole("heading", { name: destinationHeading }),
+      ).toBeVisible();
+    },
+  );
 });

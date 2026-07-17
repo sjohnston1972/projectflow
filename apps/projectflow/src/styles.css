@@ -472,9 +472,22 @@ button {
   overflow: hidden;
   min-height: 112px;
   padding: 17px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   background: #fff;
   border: 1px solid #dfe4e7;
   border-radius: 7px;
+  cursor: pointer;
+}
+
+.metric:hover {
+  border-color: #b8c3c9;
+}
+
+.metric:focus-visible {
+  outline: 3px solid rgba(58, 116, 165, 0.3);
+  outline-offset: 2px;
 }
 
 .metric::before {

@@ -525,6 +525,7 @@ export function App() {
               projects={projects}
               tasks={tasks}
               onOpenProject={openProject}
+              onOpenProjects={() => navigate("projects")}
               onOpenProjectTasks={(projectId) =>
                 navigate("project-tasks", projectId)
               }
@@ -698,6 +699,7 @@ function Dashboard({
   projects,
   tasks,
   onOpenProject,
+  onOpenProjects,
   onOpenProjectTasks,
   onOpenReports,
   onOpenWork,
@@ -705,6 +707,7 @@ function Dashboard({
   projects: Project[];
   tasks: Task[];
   onOpenProject: (id: string) => void;
+  onOpenProjects: () => void;
   onOpenProjectTasks: (id: string) => void;
   onOpenReports: () => void;
   onOpenWork: () => void;
@@ -723,24 +726,28 @@ function Dashboard({
           value={projects.length}
           meta="2 need attention"
           tone="blue"
+          onOpen={onOpenProjects}
         />
         <Metric
           label="Open tasks"
           value={tasks.filter((task) => task.status !== "Done").length}
           meta="4 due this week"
           tone="green"
+          onOpen={onOpenWork}
         />
         <Metric
           label="My workload"
           value={assigned.length}
           meta="Across 2 projects"
           tone="amber"
+          onOpen={onOpenWork}
         />
         <Metric
           label="Team velocity"
           value="86%"
           meta="Up 4% this month"
           tone="violet"
+          onOpen={onOpenReports}
         />
       </div>
       <div className="dashboard-grid">
@@ -1434,23 +1441,27 @@ function PageHeading({
 function Metric({
   label,
   meta,
+  onOpen,
   tone,
   value,
 }: {
   label: string;
   meta: string;
+  onOpen: () => void;
   tone: string;
   value: number | string;
 }) {
   return (
-    <section
+    <button
+      type="button"
       className={`metric metric-${tone}`}
       data-darwin-id={`metric-${label.toLowerCase().replaceAll(" ", "-")}`}
+      onClick={onOpen}
     >
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{meta}</small>
-    </section>
+    </button>
   );
 }
 
