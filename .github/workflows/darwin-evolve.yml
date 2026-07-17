@@ -267,52 +267,69 @@ jobs:
       - name: Build the pull request preview
         env:
           CANDIDATE_SHA: ${{ steps.publish.outputs.head_sha }}
-          EXECUTION_ID: ${{ inputs.execution_id }}
           VITE_API_BASE_URL: https://darwin-api.stevie-johnston.workers.dev
+          VITE_BASE_PATH: /
         run: |
           export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-candidate"
-          export VITE_BASE_PATH="/projectflow/previews/${EXECUTION_ID}/"
           npm run build
-          mkdir -p ".darwin/site/previews/${EXECUTION_ID}"
-          cp -R apps/projectflow/dist/. ".darwin/site/previews/${EXECUTION_ID}/"
-
-          git worktree add --detach /tmp/projectflow-main origin/main
-          cd /tmp/projectflow-main
-          npm ci
-          export VITE_API_BASE_URL=https://darwin-api.stevie-johnston.workers.dev
-          export VITE_APP_VERSION="$(git rev-parse --short=12 HEAD)"
-          export VITE_BASE_PATH=/projectflow/
-          npm run build
-          cp -R apps/projectflow/dist/. "$GITHUB_WORKSPACE/.darwin/site/"
-          cp apps/projectflow/dist/index.html "$GITHUB_WORKSPACE/.darwin/site/404.html"
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          path: .darwin/site
+          name: projectflow-preview-${{ inputs.execution_id }}
+          path: apps/projectflow/dist
+          if-no-files-found: error
+          retention-days: 7
 
   deploy_preview:
     needs: [prepare, open_pull_request]
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: read
     steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: projectflow-preview-${{ inputs.execution_id }}
+          path: apps/projectflow/dist
       - name: Deploy the mutation preview
         id: deployment
-        uses: actions/deploy-pages@v4
+        env:
+          BRANCH: ${{ needs.prepare.outputs.branch }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HEAD_SHA: ${{ needs.open_pull_request.outputs.head_sha }}
+        run: |
+          npx wrangler@4.111.0 pages deploy apps/projectflow/dist \
+            --project-name darwin-projectflow \
+            --branch "$BRANCH" \
+            --commit-hash "$HEAD_SHA" \
+            --commit-dirty=false
+
+          preview_url=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            deployments=$(curl --fail-with-body --retry 3 \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/darwin-projectflow/deployments")
+            preview_url=$(echo "$deployments" | jq -r \
+              --arg sha "$HEAD_SHA" \
+              '[.result[] | select(.deployment_trigger.metadata.commit_hash == $sha)][0].url // empty')
+            if [ -n "$preview_url" ]; then
+              break
+            fi
+            sleep 2
+          done
+          test -n "$preview_url"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
       - name: Report preview readiness
         env:
           CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
           CALLBACK_URL: ${{ inputs.callback_url }}
-          EXECUTION_ID: ${{ inputs.execution_id }}
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          PREVIEW_URL: ${{ steps.deployment.outputs.preview_url }}
         run: |
           jq -n \
             --arg status preview_ready \
-            --arg previewUrl "${PAGE_URL}previews/${EXECUTION_ID}/?study=true" \
+            --arg previewUrl "${PREVIEW_URL}/?study=true" \
             '{status:$status,previewUrl:$previewUrl}' > callback.json
           curl --fail-with-body --retry 3 -X POST \
             -H "Authorization: Bearer $CALLBACK_TOKEN" \

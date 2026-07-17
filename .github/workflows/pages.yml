@@ -1,4 +1,4 @@
-name: Deploy ProjectFlow
+name: Deploy ProjectFlow to Cloudflare
 
 on:
   push:
@@ -7,18 +7,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: projectflow-pages
+  group: projectflow-production
   cancel-in-progress: true
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,12 +28,14 @@ jobs:
           npm run build
         env:
           VITE_API_BASE_URL: https://darwin-api.stevie-johnston.workers.dev
-          VITE_BASE_PATH: /projectflow/
-      - name: Add the single-page study fallback
-        run: cp apps/projectflow/dist/index.html apps/projectflow/dist/404.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/projectflow/dist
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          VITE_BASE_PATH: /
+      - name: Deploy production
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx wrangler@4.111.0 pages deploy apps/projectflow/dist \
+            --project-name darwin-projectflow \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-dirty=false
