@@ -78,6 +78,45 @@ describe("standalone ProjectFlow", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("runs the synthetic Darwin Lab task with a hidden success oracle", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?study=true&lab=true&source=synthetic&studyId=projectflow-darwin-lab-test&participantId=lab-agent-01&sessionId=lab-session-test",
+    );
+    const { container } = render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Find Project Apollo assignees" }),
+    ).toBeVisible();
+    expect(screen.getByText("SYNTHETIC")).toBeVisible();
+    expect(container).toHaveTextContent("Synthetic evidence only");
+    expect(
+      container.querySelector('[data-darwin-lab-ready="true"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-darwin-lab-oracle="success"]'),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Projects/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Project Apollo/ }));
+    expect(screen.getAllByText("Sarah Wilson").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Jack Reid").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("David Bell").length).toBeGreaterThan(1);
+
+    for (const person of ["Sarah Wilson", "Jack Reid", "David Bell"]) {
+      fireEvent.click(screen.getByRole("checkbox", { name: person }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Submit selection" }));
+
+    expect(
+      screen.getByText("The complete assignment set was found."),
+    ).toBeVisible();
+    expect(
+      container.querySelector('[data-darwin-lab-oracle="success"]'),
+    ).not.toBeNull();
+  });
+
   it("retains more than 40 events in the session evidence stream", () => {
     window.history.replaceState({}, "", "/study");
     const { container } = render(<App />);
