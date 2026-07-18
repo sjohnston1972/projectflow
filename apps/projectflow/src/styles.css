@@ -7,7 +7,7 @@
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    'Segoe UI',
+    "Segoe UI",
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -483,7 +483,7 @@ button {
   left: 0;
   width: 100%;
   height: 3px;
-  content: '';
+  content: "";
 }
 
 .metric-blue::before {
@@ -1106,6 +1106,105 @@ button {
   color: #91a0a9;
   font-size: 10px;
   line-height: 1.55;
+}
+
+.lab-answer {
+  display: grid;
+  gap: 14px;
+  margin: 6px 14px 0;
+  padding: 15px;
+  background: #0c1419;
+  border: 1px solid #2b3b44;
+  border-radius: 6px;
+}
+
+.lab-answer fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.lab-answer legend {
+  padding: 0;
+  color: #dce5e8;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.lab-people {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.lab-people label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  color: #aab8be;
+  background: #162229;
+  border: 1px solid #2b3b43;
+  border-radius: 4px;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.lab-people label:has(input:checked) {
+  color: #e8fff5;
+  background: #214737;
+  border-color: #4c8d72;
+}
+
+.lab-people input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: #68d4a4;
+}
+
+.lab-answer .button-primary {
+  width: 100%;
+  justify-content: center;
+}
+
+.lab-answer-state {
+  min-height: 28px;
+  margin: 0;
+  color: #71838b;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.lab-answer-state.is-incorrect {
+  color: #e7b85b;
+}
+
+.lab-answer-state.is-success {
+  color: #68d4a4;
+}
+
+.lab-boundary {
+  display: grid;
+  gap: 5px;
+  margin: auto 14px 16px;
+  padding: 13px;
+  color: #798b94;
+  background: #111d23;
+  border: 1px solid #27363e;
+  border-radius: 6px;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.lab-boundary strong {
+  color: #d8e1e4;
+  font-size: 8px;
+  text-transform: uppercase;
 }
 
 .study-tasks {

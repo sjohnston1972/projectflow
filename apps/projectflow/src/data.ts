@@ -75,6 +75,78 @@ export const initialTasks: Task[] = [
   },
 ];
 
+export const labProjects: Project[] = [
+  {
+    id: 'apollo',
+    name: 'Project Apollo',
+    code: 'APL',
+    owner: 'Priya Shah',
+    status: 'At risk',
+    dueDate: 'Jul 22',
+  },
+  ...initialProjects.filter((project) => project.id !== 'apollo'),
+];
+
+export const labTasks: Task[] = [
+  {
+    id: 'APL-301',
+    projectId: 'apollo',
+    title: 'Prepare launch brief',
+    assignee: 'Sarah Wilson',
+    status: 'In progress',
+    dueDate: 'Jul 19',
+  },
+  {
+    id: 'APL-302',
+    projectId: 'apollo',
+    title: 'Validate rollout safeguards',
+    assignee: 'Jack Reid',
+    status: 'To do',
+    dueDate: 'Jul 20',
+  },
+  {
+    id: 'APL-303',
+    projectId: 'apollo',
+    title: 'Review telemetry dashboard',
+    assignee: 'David Bell',
+    status: 'To do',
+    dueDate: 'Jul 21',
+  },
+  {
+    id: 'ATM-201',
+    projectId: 'atlas',
+    title: 'Verify migration inventory',
+    assignee: 'Naomi Brooks',
+    status: 'In progress',
+    dueDate: 'Jul 24',
+  },
+  {
+    id: 'RET-201',
+    projectId: 'retention',
+    title: 'Review cohort summary',
+    assignee: 'Priya Shah',
+    status: 'Done',
+    dueDate: 'Jul 16',
+  },
+  {
+    id: 'MOB-201',
+    projectId: 'mobile',
+    title: 'Confirm device matrix',
+    assignee: 'Marcus Chen',
+    status: 'To do',
+    dueDate: 'Jul 28',
+  },
+];
+
+export const labCandidatePeople = [
+  'Sarah Wilson',
+  'Jack Reid',
+  'David Bell',
+  'Naomi Brooks',
+  'Priya Shah',
+  'Marcus Chen',
+] as const;
+
 export const studyTasks = [
   {
     id: 'find-assigned-task',
