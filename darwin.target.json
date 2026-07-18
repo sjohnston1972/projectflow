@@ -4,6 +4,91 @@
   "name": "ProjectFlow",
   "purpose": "Task management for creating projects, assigning work, and coordinating delivery.",
   "defaultBranch": "main",
+  "application": {
+    "primaryUser": "A knowledge worker managing personal tasks and shared project delivery.",
+    "domainEntities": ["workspace", "project", "task", "user", "report"],
+    "primaryGoals": [
+      "find assigned work",
+      "create and assign tasks",
+      "monitor project delivery",
+      "review team workload"
+    ],
+    "navigation": ["Dashboard", "My Work", "Projects", "Reports", "Settings"],
+    "capabilities": [
+      "dashboard work summary",
+      "global task search",
+      "direct assigned-work view",
+      "project-scoped task search",
+      "task creation",
+      "delivery reporting",
+      "workspace settings"
+    ],
+    "interfaceInventory": [
+      {
+        "area": "dashboard",
+        "purpose": "Summarise assigned work, project health, capacity, and activity.",
+        "primaryActions": [
+          "open assigned work",
+          "open a project",
+          "open reports"
+        ]
+      },
+      {
+        "area": "my-work",
+        "purpose": "Find and open work assigned to the current user.",
+        "primaryActions": [
+          "search assigned tasks",
+          "open a task",
+          "create a task"
+        ]
+      },
+      {
+        "area": "projects",
+        "purpose": "Browse projects and project-scoped work.",
+        "primaryActions": [
+          "search projects",
+          "create project",
+          "open project",
+          "open project tasks"
+        ]
+      },
+      {
+        "area": "reporting",
+        "purpose": "Review delivery metrics and project status.",
+        "primaryActions": ["open reports", "inspect delivery metrics"]
+      },
+      {
+        "area": "global-header",
+        "purpose": "Provide workspace-wide search, task creation, and navigation context.",
+        "primaryActions": [
+          "search all tasks",
+          "create a task",
+          "view notifications"
+        ]
+      }
+    ],
+    "routes": [
+      "/dashboard",
+      "/my-work",
+      "/projects",
+      "/projects/:projectId",
+      "/projects/:projectId/tasks",
+      "/reports",
+      "/settings"
+    ],
+    "mutableAreas": [
+      "navigation",
+      "search",
+      "task-discovery",
+      "item-presentation",
+      "contextual-help",
+      "interaction-behavior",
+      "drag-and-drop",
+      "in-app-history",
+      "typography"
+    ],
+    "protectedAreas": ["telemetry-history", "authentication", "database-schema"]
+  },
   "mutablePaths": [
     "apps/projectflow/src/App.tsx",
     "apps/projectflow/src/App.test.tsx",
@@ -26,10 +111,6 @@
     "apps/projectflow/src/data.ts",
     "apps/projectflow/src/styles.css"
   ],
-  "validationCommands": [
-    "npm run typecheck",
-    "npm run test",
-    "npm run build"
-  ],
+  "validationCommands": ["npm run typecheck", "npm run test", "npm run build"],
   "limits": { "maximumChangedFiles": 4, "maximumChangedLines": 1200 }
 }
