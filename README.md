@@ -34,3 +34,7 @@ Every build publishes privacy-safe semantic deployment metadata in the HTML
 head: `darwin-commit-sha` identifies the full source commit and
 `darwin-app-version` identifies the measured version. Darwin verifies both
 values after a reviewed merge before it opens a new evidence cycle.
+
+The baseline reset workflow reports its running, validation, failure, and
+deployment states through an execution-scoped signed callback. Darwin keeps
+the measured study locked until production reports the restored commit.
