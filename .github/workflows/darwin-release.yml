@@ -1,0 +1,90 @@
+name: Deploy Darwin release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable Darwin semantic release tag
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: darwin-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out the Darwin release
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: sjohnston1972/darwin
+          ref: ${{ inputs.release_tag }}
+          path: .artifacts/darwin
+      - name: Check out the tagged ProjectFlow baseline
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: demo-baseline-v2
+          path: .artifacts/darwin/.artifacts/projectflow-target
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .artifacts/darwin/package-lock.json
+      - name: Verify the immutable Darwin release and CI result
+        id: release
+        working-directory: .artifacts/darwin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          echo "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'
+          tag_sha=$(git rev-list -n 1 "$RELEASE_TAG")
+          test "$tag_sha" = "$(git rev-parse HEAD)"
+          conclusion=$(gh api \
+            "repos/sjohnston1972/darwin/actions/workflows/ci.yml/runs?head_sha=${tag_sha}&status=completed&per_page=10" \
+            --jq '.workflow_runs | first | .conclusion // "missing"')
+          test "$conclusion" = 'success'
+          echo "sha=$tag_sha" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+        working-directory: .artifacts/darwin
+      - run: npm ci
+        working-directory: .artifacts/darwin/.artifacts/projectflow-target
+      - run: npx playwright install --with-deps chromium
+        working-directory: .artifacts/darwin
+      - run: npm run format:check
+        working-directory: .artifacts/darwin
+      - run: npm run lint
+        working-directory: .artifacts/darwin
+      - run: npm run typecheck
+        working-directory: .artifacts/darwin
+      - run: npm run test
+        working-directory: .artifacts/darwin
+      - run: npm audit --audit-level=high
+        working-directory: .artifacts/darwin
+      - name: Run the complete browser demo suite before deploy
+        working-directory: .artifacts/darwin
+        env:
+          PROJECTFLOW_E2E_DIR: .artifacts/projectflow-target
+        run: npm run test:e2e
+      - name: Deploy the tagged Darwin release
+        working-directory: .artifacts/darwin
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DARWIN_COMMIT_SHA: ${{ steps.release.outputs.sha }}
+          DARWIN_RELEASE_TAG: ${{ inputs.release_tag }}
+          REQUIRE_DARWIN_RELEASE_TAG: "1"
+        run: npm run deploy
+      - name: Verify production
+        working-directory: .artifacts/darwin
+        env:
+          DARWIN_COMMIT_SHA: ${{ steps.release.outputs.sha }}
+          DARWIN_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: npm run smoke:production
