@@ -78,19 +78,18 @@ describe("standalone ProjectFlow", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("runs the synthetic Darwin Lab task with a hidden success oracle", () => {
+  it("runs a configurable Darwin Lab task without a target-side oracle", () => {
     window.history.replaceState(
       {},
       "",
-      "/?study=true&lab=true&source=synthetic&studyId=projectflow-darwin-lab-test&participantId=lab-agent-01&sessionId=lab-session-test",
+      "/study/projects?study=true&lab=true&source=automated&studyId=projectflow-darwin-lab-test&participantId=lab-agent-01&sessionId=lab-session-test&experimentId=lab-experiment-test&runId=lab-run-test&taskId=review-projects&appVersion=baseline&taskDefinitionId=lab-task-test&taskDefinitionHash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
     const { container } = render(<App />);
 
+    expect(screen.getByRole("heading", { name: "Projects" })).toBeVisible();
     expect(
-      screen.getByRole("heading", { name: "Find Project Apollo assignees" }),
+      screen.getByRole("heading", { name: "Session evidence" }),
     ).toBeVisible();
-    expect(screen.getByText("SYNTHETIC")).toBeVisible();
-    expect(container).toHaveTextContent("Synthetic evidence only");
     expect(
       container.querySelector('[data-darwin-lab-ready="true"]'),
     ).not.toBeNull();
@@ -98,23 +97,15 @@ describe("standalone ProjectFlow", () => {
       container.querySelector('[data-darwin-lab-oracle="success"]'),
     ).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /Projects/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Project Apollo/ }));
-    expect(screen.getAllByText("Sarah Wilson").length).toBeGreaterThan(1);
-    expect(screen.getAllByText("Jack Reid").length).toBeGreaterThan(1);
-    expect(screen.getAllByText("David Bell").length).toBeGreaterThan(1);
-
-    for (const person of ["Sarah Wilson", "Jack Reid", "David Bell"]) {
-      fireEvent.click(screen.getByRole("checkbox", { name: person }));
-    }
-    fireEvent.click(screen.getByRole("button", { name: "Submit selection" }));
-
+    fireEvent.click(
+      container.querySelector('[data-darwin-id="project-open-apollo"]')!,
+    );
     expect(
-      screen.getByText("The complete assignment set was found."),
+      screen.getByRole("heading", { name: "Apollo Release" }),
     ).toBeVisible();
-    expect(
-      container.querySelector('[data-darwin-lab-oracle="success"]'),
-    ).not.toBeNull();
+    expect(window.location.pathname).toBe("/study/projects/apollo");
+    expect(screen.getByText("task started")).toBeVisible();
+    expect(container).not.toHaveTextContent("SYNTHETIC");
   });
 
   it("retains more than 40 events in the session evidence stream", () => {

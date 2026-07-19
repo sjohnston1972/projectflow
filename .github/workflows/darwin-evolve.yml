@@ -27,6 +27,14 @@ on:
         description: One-time execution callback nonce
         required: true
         type: string
+      provenance_class:
+        description: Immutable Darwin evidence provenance
+        required: true
+        type: string
+      lab_experiment_id:
+        description: Darwin Lab experiment when applicable
+        required: false
+        type: string
 
 env:
   CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
@@ -230,6 +238,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ needs.prepare.outputs.branch }}
+          PROVENANCE_CLASS: ${{ inputs.provenance_class }}
+          LAB_EXPERIMENT_ID: ${{ inputs.lab_experiment_id }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -240,11 +250,22 @@ jobs:
           head_sha=$(git rev-parse HEAD)
           pr_url=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url')
           if [ -z "$pr_url" ]; then
+            if [ "$PROVENANCE_CLASS" = "darwin_lab" ]; then
+              evidence_note="Codex generated this bounded mutation from Darwin Lab automated observations (${LAB_EXPERIMENT_ID})."
+            else
+              evidence_note="Codex generated this bounded mutation from measured Darwin evidence."
+            fi
             pr_url=$(gh pr create \
               --base main \
               --head "$BRANCH" \
               --title "Darwin evolution: ${{ inputs.manifest_id }}" \
-              --body "Codex generated this bounded mutation from measured Darwin evidence. Review the real diff and validation checks before release.")
+              --body "${evidence_note} Review the real diff and validation checks before release.")
+          fi
+          if [ "$PROVENANCE_CLASS" = "darwin_lab" ]; then
+            gh label create "Darwin Lab" --color "B9F36B" --description "Mutation derived from Darwin Lab automated observations" --force
+            gh pr edit "$pr_url" --add-label "Darwin Lab"
+            echo "### Darwin Lab provenance" >> "$GITHUB_STEP_SUMMARY"
+            echo "Experiment: ${LAB_EXPERIMENT_ID}" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
           echo "pull_request_url=$pr_url" >> "$GITHUB_OUTPUT"

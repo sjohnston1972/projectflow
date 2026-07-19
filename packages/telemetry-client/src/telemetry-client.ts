@@ -5,6 +5,7 @@ import {
   type StudyTelemetryEvent,
   type TelemetryReceipt,
   type ViewportClass,
+  type DarwinProvenance,
 } from '@darwin/shared';
 
 type ClientSource = 'real_user' | 'automated' | 'synthetic';
@@ -16,6 +17,8 @@ export interface TelemetryClientConfig {
   participantId: string;
   endpoint?: string;
   source?: ClientSource;
+  provenance?: DarwinProvenance;
+  studySessionToken?: string;
   sessionId?: string;
   initialRoute?: string;
   flushIntervalMs?: number;
@@ -248,6 +251,7 @@ export class DarwinTelemetryClient {
     this.flushTimer = null;
     this.retryTimer = null;
     this.initialized = false;
+    this.flushWithBeacon();
   }
 
   trackPageView(route = this.currentRoute) {
@@ -412,7 +416,12 @@ export class DarwinTelemetryClient {
     try {
       const response = await this.fetcher(this.config.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.studySessionToken
+            ? { 'X-Darwin-Study-Session': this.config.studySessionToken }
+            : {}),
+        },
         body: JSON.stringify(batch),
         keepalive: true,
       });
@@ -1031,6 +1040,9 @@ export class DarwinTelemetryClient {
       studyId: this.config.studyId,
       appVersion: this.config.appVersion,
       source: this.config.source,
+      ...(this.config.provenance
+        ? { provenance: this.config.provenance }
+        : {}),
       occurredAt: new Date().toISOString(),
       sequence: this.sequence++,
       route: this.currentRoute,

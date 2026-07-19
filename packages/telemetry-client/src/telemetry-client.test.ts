@@ -229,6 +229,17 @@ describe('DarwinTelemetryClient', () => {
       endpoint: '/api/telemetry/events',
       initialRoute: '/study',
       batchSize: 20,
+      studySessionToken: 'signed-study-session',
+      provenance: {
+        evidenceClass: 'human_study',
+        label: 'Human study',
+        labExperimentId: null,
+        taskDefinitionId: null,
+        taskDefinitionHash: null,
+        evidencePackId: null,
+        evidenceHash: null,
+        runIds: [],
+      },
       fetcher,
     });
     client.init();
@@ -243,8 +254,14 @@ describe('DarwinTelemetryClient', () => {
     expect(fetcher).toHaveBeenCalledOnce();
 
     const request = fetcher.mock.calls[0]?.[1];
-    const body = JSON.parse(String(request?.body)) as { events: unknown[] };
+    const body = JSON.parse(String(request?.body)) as {
+      events: Array<{ provenance: { evidenceClass: string } }>;
+    };
     expect(body.events).toHaveLength(2);
+    expect(body.events[0]?.provenance.evidenceClass).toBe('human_study');
+    expect(new Headers(request?.headers).get('X-Darwin-Study-Session')).toBe(
+      'signed-study-session',
+    );
 
     client.destroy();
   });
