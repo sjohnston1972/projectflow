@@ -181,6 +181,7 @@ jobs:
           VITE_BASE_PATH: /
         run: |
           export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-rollback"
+          export VITE_COMMIT_SHA="$CANDIDATE_SHA"
           npm run build
 
       - name: Deploy the rollback preview

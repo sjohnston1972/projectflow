@@ -309,6 +309,7 @@ jobs:
           VITE_BASE_PATH: /
         run: |
           export VITE_APP_VERSION="${CANDIDATE_SHA:0:12}-candidate"
+          export VITE_COMMIT_SHA="$CANDIDATE_SHA"
           npm run build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

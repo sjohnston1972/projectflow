@@ -2,6 +2,35 @@ name: Reset ProjectFlow evolution
 
 on:
   workflow_dispatch:
+    inputs:
+      reset_id:
+        description: Darwin reset execution ID
+        required: true
+        type: string
+      repository:
+        description: Expected target repository
+        required: true
+        type: string
+      callback_url:
+        description: Darwin reset callback URL
+        required: true
+        type: string
+      callback_nonce:
+        description: One-time reset callback nonce
+        required: true
+        type: string
+      reset_policy_hash:
+        description: Immutable Darwin reset policy hash
+        required: true
+        type: string
+
+env:
+  CALLBACK_TOKEN: ${{ secrets.DARWIN_CALLBACK_TOKEN }}
+  CALLBACK_NONCE: ${{ inputs.callback_nonce }}
+  CALLBACK_REPOSITORY: ${{ inputs.repository }}
+  CALLBACK_MANIFEST_HASH: ${{ inputs.reset_policy_hash }}
+  CALLBACK_EXECUTION_ID: ${{ inputs.reset_id }}
+  CALLBACK_URL: ${{ inputs.callback_url }}
 
 concurrency:
   group: projectflow-reset
@@ -22,6 +51,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Report reset running
+        run: |
+          mkdir -p .darwin
+          jq -n \
+            --arg status running \
+            --arg workflowUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --argjson workflowRunId "${{ github.run_id }}" \
+            '{status: $status, workflowRunId: $workflowRunId, workflowUrl: $workflowUrl}' \
+            > .darwin/reset-callback.json
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/reset-callback.json
       - name: Restore the measured baseline genome
         run: |
           git fetch --force origin refs/tags/demo-baseline-v2:refs/tags/demo-baseline-v2
@@ -31,9 +71,16 @@ jobs:
             apps/projectflow/src/data.ts \
             apps/projectflow/src/styles.css
       - run: npm ci
+      - name: Report reset validation
+        run: |
+          jq -n --arg status validating '{status: $status}' \
+            > .darwin/reset-callback.json
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/reset-callback.json
       - name: Validate the restored baseline
         run: npm run verify
       - name: Record the restored baseline when the genome changed
+        id: baseline
         run: |
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
@@ -46,3 +93,25 @@ jobs:
             git commit -m "chore: reset ProjectFlow to measured baseline"
             git push origin main
           fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Report baseline deployment
+        run: |
+          jq -n \
+            --arg status deploying \
+            --arg baselineCommit "${{ steps.baseline.outputs.sha }}" \
+            '{status: $status, baselineCommit: $baselineCommit}' \
+            > .darwin/reset-callback.json
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/reset-callback.json
+      - name: Report reset failure
+        if: ${{ failure() }}
+        continue-on-error: true
+        run: |
+          mkdir -p .darwin
+          jq -n \
+            --arg status failed \
+            --arg error "ProjectFlow baseline restoration or validation failed. Inspect the linked workflow run." \
+            '{status: $status, error: $error}' \
+            > .darwin/reset-callback.json
+          .github/scripts/darwin-callback.sh \
+            POST "$CALLBACK_URL" .darwin/reset-callback.json
