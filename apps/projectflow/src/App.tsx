@@ -25,15 +25,14 @@ import {
 } from "@darwin/telemetry-client";
 import {
   ParticipantWorkspaceResponseSchema,
+  StudySessionIssueResponseSchema,
+  type StudySessionIssueResponse,
   type StudyTelemetryEvent,
 } from "@darwin/shared";
 
 import {
   initialProjects,
   initialTasks,
-  labCandidatePeople,
-  labProjects,
-  labTasks,
   participantName,
   type AppRoute,
   type Project,
@@ -90,9 +89,7 @@ const loadWorkspace = (labMode = false, studyId = "default"): Workspace => {
   } catch {
     // A clean participant workspace is a safe local fallback.
   }
-  return labMode
-    ? { projects: labProjects, tasks: labTasks }
-    : { projects: initialProjects, tasks: initialTasks };
+  return { projects: initialProjects, tasks: initialTasks };
 };
 
 const getParticipantId = (key = participantKey) => {
@@ -111,25 +108,77 @@ const routePath = (route: AppRoute, projectId?: string) => {
   return `/${route}`;
 };
 
+const viewFromPath = (
+  pathname: string,
+): { route: AppRoute; projectId: string | null } => {
+  const applicationPath = pathname.replace(/^\/study(?=\/|$)/, "");
+  const segments = applicationPath.split("/").filter(Boolean);
+  if (segments[0] === "projects" && segments[1]) {
+    return {
+      route: segments[2] === "tasks" ? "project-tasks" : "project",
+      projectId: decodeURIComponent(segments[1]),
+    };
+  }
+  const route = segments[0] as AppRoute | undefined;
+  if (route && appRoutes.includes(route) && route !== "project-tasks") {
+    return { route, projectId: null };
+  }
+  return { route: "dashboard", projectId: null };
+};
+
 export function App() {
+  const initialView = useMemo(() => viewFromPath(window.location.pathname), []);
   const runtime = useMemo(() => {
     const parameters = new URLSearchParams(window.location.search);
     const source =
-      parameters.get("source") === "synthetic"
-        ? "synthetic"
-        : parameters.get("source") === "automated"
+      parameters.get("source") === "automated"
           ? "automated"
           : "real_user";
-    const labMode = source === "synthetic" && parameters.get("lab") === "true";
-    const appVersion = import.meta.env.VITE_APP_VERSION || "baseline";
+    const labMode = source === "automated" && parameters.get("lab") === "true";
+    const appVersion =
+      (labMode ? parameters.get("appVersion") : null) ||
+      import.meta.env.VITE_APP_VERSION ||
+      "baseline";
     const studyId =
       (labMode ? parameters.get("studyId") : null) ||
       import.meta.env.VITE_STUDY_ID ||
-      (source === "synthetic"
-        ? "projectflow-darwin-lab"
-        : source === "automated"
+      (source === "automated"
           ? "projectflow-baseline-automated-study"
           : "projectflow-baseline-study");
+    const experimentId = labMode ? parameters.get("experimentId") : null;
+    const runId = labMode ? parameters.get("runId") : null;
+    const taskDefinitionId = labMode
+      ? parameters.get("taskDefinitionId")
+      : null;
+    const taskDefinitionHash = labMode
+      ? parameters.get("taskDefinitionHash")
+      : null;
+    const provenance =
+      experimentId && runId && taskDefinitionId && taskDefinitionHash
+        ? {
+            evidenceClass: "darwin_lab" as const,
+            label: "Darwin Lab",
+            labExperimentId: experimentId,
+            taskDefinitionId,
+            taskDefinitionHash,
+            evidencePackId: null,
+            evidenceHash: null,
+            runIds: [runId],
+          }
+        : {
+            evidenceClass:
+              source === "real_user"
+                ? ("human_study" as const)
+                : ("automated_study" as const),
+            label:
+              source === "real_user" ? "Human study" : "Automated study",
+            labExperimentId: null,
+            taskDefinitionId: null,
+            taskDefinitionHash: null,
+            evidencePackId: null,
+            evidenceHash: null,
+            runIds: [],
+          };
     return {
       appVersion,
       source,
@@ -137,14 +186,18 @@ export function App() {
       labMode,
       participantId: labMode ? parameters.get("participantId") : null,
       sessionId: labMode ? parameters.get("sessionId") : null,
+      taskId: labMode ? parameters.get("taskId") : null,
+      experimentId,
+      runId,
+      provenance,
     } as const;
   }, []);
   const [{ projects, tasks }, setWorkspace] = useState(() =>
     loadWorkspace(runtime.labMode, runtime.studyId),
   );
-  const [route, setRoute] = useState<AppRoute>("dashboard");
+  const [route, setRoute] = useState<AppRoute>(initialView.route);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null,
+    initialView.projectId,
   );
   const [projectQuery, setProjectQuery] = useState("");
   const [taskQuery, setTaskQuery] = useState("");
@@ -152,30 +205,60 @@ export function App() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [studyMode, setStudyMode] = useState(
     () =>
-      window.location.pathname.endsWith("/study") ||
+      window.location.pathname === "/study" ||
+      window.location.pathname.startsWith("/study/") ||
       new URLSearchParams(window.location.search).get("study") === "true",
   );
   const [events, setEvents] = useState<StudyTelemetryEvent[]>([]);
-  const [labSelectedPeople, setLabSelectedPeople] = useState<string[]>([]);
-  const [labAnswerState, setLabAnswerState] = useState<
-    "open" | "incorrect" | "success"
-  >("open");
+  const [workflowOutcome, setWorkflowOutcome] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const participantId = useMemo(
+  const fallbackParticipantId = useMemo(
     () =>
       runtime.participantId ||
       getParticipantId(`${participantKey}:${runtime.studyId}`),
     [runtime.participantId, runtime.studyId],
   );
+  const [studySession, setStudySession] =
+    useState<StudySessionIssueResponse | null>(null);
+  const participantId =
+    studySession?.claims.participantId ?? fallbackParticipantId;
+  const sessionId =
+    studySession?.claims.sessionId ?? runtime.sessionId ?? undefined;
+  const studySessionReady =
+    import.meta.env.MODE === "test" || Boolean(studySession);
   const telemetryRef = useRef<DarwinTelemetryClient | null>(null);
   const captureCompletedRef = useRef(false);
   const historyIndexRef = useRef(0);
   const currentViewRef = useRef({
-    route: "dashboard" as AppRoute,
-    projectId: null as string | null,
+    route: initialView.route,
+    projectId: initialView.projectId,
   });
 
   useEffect(() => {
+    if (import.meta.env.MODE === "test") return;
+    const controller = new AbortController();
+    void fetch(`${apiBaseUrl}/study-sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studyId: runtime.studyId,
+        appVersion: runtime.appVersion,
+        evidenceClass: runtime.provenance.evidenceClass,
+        labExperimentId: runtime.experimentId,
+        runId: runtime.runId,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Study session could not be issued.");
+        setStudySession(StudySessionIssueResponseSchema.parse(await response.json()));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [runtime]);
+
+  useEffect(() => {
+    if (!studySessionReady) return;
     localStorage.setItem(
       runtime.labMode ? `${workspaceKey}:lab:${runtime.studyId}` : workspaceKey,
       JSON.stringify({ projects, tasks }),
@@ -187,6 +270,14 @@ export function App() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
+          ...(studySession?.token
+            ? {
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Darwin-Study-Session": studySession.token,
+                },
+              }
+            : {}),
           body: JSON.stringify({
             projects,
             tasks,
@@ -196,14 +287,30 @@ export function App() {
       ).catch(() => undefined);
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [participantId, projects, runtime.labMode, runtime.studyId, tasks]);
+  }, [
+    participantId,
+    projects,
+    runtime.labMode,
+    runtime.studyId,
+    studySession,
+    studySessionReady,
+    tasks,
+  ]);
 
   useEffect(() => {
+    if (!studySessionReady) return;
     if (import.meta.env.MODE === "test") return;
     const controller = new AbortController();
     void fetch(
       `${apiBaseUrl}/studies/${runtime.studyId}/participants/${participantId}/workspace`,
-      { signal: controller.signal },
+      {
+        signal: controller.signal,
+        ...(studySession?.token
+          ? {
+              headers: { "X-Darwin-Study-Session": studySession.token },
+            }
+          : {}),
+      },
     )
       .then(async (response) => {
         if (!response.ok) return;
@@ -219,17 +326,20 @@ export function App() {
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [participantId, runtime.studyId]);
+  }, [participantId, runtime.studyId, studySession, studySessionReady]);
 
   useEffect(() => {
+    if (!studySessionReady) return;
     const telemetry = createTelemetryClient({
       appVersion: runtime.appVersion,
       studyId: runtime.studyId,
       participantId,
       source: runtime.source,
-      sessionId: runtime.sessionId ?? undefined,
+      provenance: runtime.provenance,
+      sessionId,
+      studySessionToken: studySession?.token,
       initialRoute: runtime.labMode
-        ? "/lab/dashboard"
+        ? window.location.pathname
         : studyMode
           ? "/study/dashboard"
           : "/dashboard",
@@ -243,13 +353,13 @@ export function App() {
     telemetryRef.current = telemetry;
     captureCompletedRef.current = false;
     telemetry.init();
-    if (runtime.labMode) telemetry.taskStarted("find-apollo-assignees");
+    if (runtime.labMode) telemetry.taskStarted(runtime.taskId || "lab-task");
     else if (studyMode) telemetry.taskStarted("find-assigned-task");
     return () => {
       telemetry.destroy();
       telemetryRef.current = null;
     };
-  }, [participantId, runtime, studyMode]);
+  }, [participantId, runtime, sessionId, studyMode, studySession, studySessionReady]);
 
   useEffect(() => {
     const currentState: ProjectFlowHistoryState = {
@@ -267,7 +377,7 @@ export function App() {
       const next = historyStateOf(event.state);
       if (!next) return;
       const previous = currentViewRef.current;
-      const prefix = runtime.labMode ? "/lab" : studyMode ? "/study" : "";
+      const prefix = studyMode ? "/study" : "";
       const fromRoute = `${prefix}${routePath(previous.route, previous.projectId ?? undefined)}`;
       const toRoute = `${prefix}${routePath(next.route, next.projectId ?? undefined)}`;
       telemetryRef.current?.trackBrowserNavigation(
@@ -320,39 +430,18 @@ export function App() {
       route: nextRoute,
       projectId: nextProjectId,
     };
+    const nextPath = `${studyMode ? "/study" : ""}${routePath(nextRoute, projectId)}`;
     window.history.pushState(
       { ...window.history.state, projectFlow: nextHistoryState },
       "",
-      window.location.href,
+      `${nextPath}${window.location.search}${window.location.hash}`,
     );
     historyIndexRef.current = nextHistoryState.index;
     currentViewRef.current = { route: nextRoute, projectId: nextProjectId };
     setRoute(nextRoute);
     setSelectedProjectId(nextProjectId);
     setMobileNavOpen(false);
-    telemetryRef.current?.trackRouteChanged(
-      `${runtime.labMode ? "/lab" : studyMode ? "/study" : ""}${routePath(nextRoute, projectId)}`,
-    );
-  };
-
-  const submitLabAnswer = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const expected = ["David Bell", "Jack Reid", "Sarah Wilson"];
-    const selected = [...labSelectedPeople].sort();
-    const success =
-      selected.length === expected.length &&
-      selected.every((person, index) => person === expected[index]);
-    if (success) {
-      setLabAnswerState("success");
-      telemetryRef.current?.taskCompleted("success");
-      return;
-    }
-    setLabAnswerState("incorrect");
-    telemetryRef.current?.trackValidationError(
-      "lab-answer-submit",
-      "lab-answer-selection",
-      "incomplete-selection",
-    );
+    telemetryRef.current?.trackRouteChanged(nextPath);
   };
 
   const openProject = (projectId: string) => navigate("project", projectId);
@@ -360,12 +449,13 @@ export function App() {
   const markSatisfied = (taskId: string) => {
     if (
       !studyMode ||
-      taskId !== "find-assigned-task" ||
+      (!runtime.labMode && taskId !== "find-assigned-task") ||
       captureCompletedRef.current
     ) {
       return;
     }
     captureCompletedRef.current = true;
+    setWorkflowOutcome(`${taskId}:success`);
     telemetryRef.current?.taskCompleted("success");
   };
 
@@ -478,6 +568,9 @@ export function App() {
       className={`app-shell ${studyMode ? "has-study" : ""} ${runtime.labMode ? "has-lab" : ""}`}
       data-darwin-lab-ready={runtime.labMode ? "true" : undefined}
     >
+      {workflowOutcome && (
+        <span hidden data-darwin-workflow-outcome={workflowOutcome} />
+      )}
       <aside className={`sidebar ${mobileNavOpen ? "is-open" : ""}`}>
         <button
           className="brand"
@@ -640,7 +733,7 @@ export function App() {
         </main>
       </div>
 
-      {studyMode && !runtime.labMode && (
+      {studyMode && (
         <StudyPanel
           events={events}
           participantId={participantId}
@@ -648,18 +741,6 @@ export function App() {
         />
       )}
 
-      {runtime.labMode && (
-        <LabStudyPanel
-          answerState={labAnswerState}
-          selectedPeople={labSelectedPeople}
-          onChange={setLabSelectedPeople}
-          onSubmit={submitLabAnswer}
-        />
-      )}
-
-      {labAnswerState === "success" && (
-        <span hidden data-darwin-lab-oracle="success" />
-      )}
 
       {showProjectForm && (
         <Modal title="Create project" onClose={() => setShowProjectForm(false)}>
@@ -1353,94 +1434,6 @@ const formatDuration = (milliseconds: number) =>
   milliseconds >= 1_000
     ? `${(milliseconds / 1_000).toFixed(1)}s`
     : `${milliseconds}ms`;
-
-function LabStudyPanel({
-  answerState,
-  selectedPeople,
-  onChange,
-  onSubmit,
-}: {
-  answerState: "open" | "incorrect" | "success";
-  selectedPeople: string[];
-  onChange: (people: string[]) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  const togglePerson = (person: string, checked: boolean) => {
-    onChange(
-      checked
-        ? [...selectedPeople, person]
-        : selectedPeople.filter((candidate) => candidate !== person),
-    );
-  };
-
-  return (
-    <aside
-      className="study-panel lab-study-panel"
-      aria-label="Darwin Lab synthetic study"
-    >
-      <header>
-        <div>
-          <span className="live-dot" /> Darwin Lab
-        </div>
-        <strong>SYNTHETIC</strong>
-      </header>
-      <div className="study-intro">
-        <span>Bounded usability task</span>
-        <h2>Find Project Apollo assignees</h2>
-        <p>
-          Use ProjectFlow to find everyone assigned to Project Apollo, then
-          submit the complete set below.
-        </p>
-      </div>
-      <form className="lab-answer" onSubmit={onSubmit}>
-        <fieldset disabled={answerState === "success"}>
-          <legend>Who is assigned to Project Apollo?</legend>
-          <div className="lab-people">
-            {labCandidatePeople.map((person) => {
-              const id = `lab-person-${person.toLowerCase().replaceAll(" ", "-")}`;
-              return (
-                <label key={person} htmlFor={id}>
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={selectedPeople.includes(person)}
-                    data-darwin-id={id}
-                    onChange={(event) =>
-                      togglePerson(person, event.currentTarget.checked)
-                    }
-                  />
-                  <span>{person}</span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-        <button
-          className="button-primary"
-          type="submit"
-          data-darwin-id="lab-answer-submit"
-          disabled={answerState === "success"}
-        >
-          {answerState === "success" ? "Task complete" : "Submit selection"}
-        </button>
-        <p className={`lab-answer-state is-${answerState}`} aria-live="polite">
-          {answerState === "success"
-            ? "The complete assignment set was found."
-            : answerState === "incorrect"
-              ? "That set is incomplete. Keep investigating ProjectFlow."
-              : "The answer is evaluated locally and is never shown to the agent."}
-        </p>
-      </form>
-      <div className="lab-boundary">
-        <strong>Synthetic evidence only</strong>
-        <span>
-          This browser is an isolated AI-agent run. It does not represent a
-          human participant or measured product fitness.
-        </span>
-      </div>
-    </aside>
-  );
-}
 
 function StudyPanel({
   events,

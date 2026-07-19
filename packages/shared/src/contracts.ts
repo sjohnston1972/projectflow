@@ -49,7 +49,14 @@ const StudyIdentifierSchema = z
   .min(1)
   .max(128)
   .regex(/^[a-zA-Z0-9._:-]+$/);
-const StudyRouteSchema = z.string().min(1).max(256).startsWith('/');
+const StudyRouteSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(
+    /^\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[A-Fa-f0-9]{2})*(?:\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[A-Fa-f0-9]{2})+)*\/?$/,
+    'Route must be a safe application pathname without query, fragment, whitespace, or control characters.',
+  );
 const SemanticTargetSchema = z
   .string()
   .min(1)
@@ -61,6 +68,25 @@ export const StudyTelemetrySourceSchema = z.enum([
   'automated',
   'synthetic',
 ]);
+
+export const DarwinProvenanceSchema = z
+  .object({
+    evidenceClass: z.enum([
+      'human_study',
+      'automated_study',
+      'darwin_lab',
+      'scale_replay',
+      'legacy',
+    ]),
+    label: z.string().min(1).max(48),
+    labExperimentId: z.string().min(1).max(128).nullable(),
+    taskDefinitionId: z.string().min(1).max(128).nullable(),
+    taskDefinitionHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    evidencePackId: z.string().min(1).max(128).nullable(),
+    evidenceHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    runIds: z.array(z.string().min(1).max(128)).max(20),
+  })
+  .strict();
 
 export const ViewportClassSchema = z.enum(['mobile', 'tablet', 'desktop']);
 export const PointerTypeSchema = z.enum(['mouse', 'touch', 'pen', 'unknown']);
@@ -82,6 +108,7 @@ const StudyEventBaseSchema = z
     studyId: StudyIdentifierSchema,
     appVersion: z.string().min(1).max(32),
     source: StudyTelemetrySourceSchema,
+    provenance: DarwinProvenanceSchema.optional(),
     occurredAt: z.string().datetime(),
     sequence: z.number().int().nonnegative(),
     route: StudyRouteSchema,
@@ -354,6 +381,7 @@ export const StoredTelemetryEventSchema = z.discriminatedUnion('eventType', [
 export const StudyEventsResponseSchema = z.object({
   studyId: StudyIdentifierSchema,
   events: z.array(StoredTelemetryEventSchema),
+  cursor: z.string().datetime().nullable().default(null),
   count: z.number().int().nonnegative(),
   sessionCounts: z.record(z.string(), z.number().int().nonnegative()),
   participantCount: z.number().int().nonnegative(),
@@ -365,6 +393,48 @@ export const StudySessionResponseSchema = z.object({
   sessionId: StudyIdentifierSchema,
   events: z.array(StoredTelemetryEventSchema),
 });
+
+export const StudyEvidenceClassSchema = z.enum([
+  "human_study",
+  "automated_study",
+  "darwin_lab",
+]);
+
+export const StudySessionIssueRequestSchema = z
+  .object({
+    studyId: StudyIdentifierSchema,
+    appVersion: z.string().min(1).max(32),
+    evidenceClass: StudyEvidenceClassSchema,
+    labExperimentId: StudyIdentifierSchema.nullable().default(null),
+    runId: StudyIdentifierSchema.nullable().default(null),
+  })
+  .strict();
+
+export const StudySessionClaimsSchema = z
+  .object({
+    version: z.literal(1),
+    studyId: StudyIdentifierSchema,
+    participantId: StudyIdentifierSchema,
+    sessionId: StudyIdentifierSchema,
+    appVersion: z.string().min(1).max(32),
+    evidenceClass: StudyEvidenceClassSchema,
+    source: z.enum(["real_user", "automated"]),
+    targetId: z.literal("projectflow"),
+    deploymentOrigin: z.string().url(),
+    labExperimentId: StudyIdentifierSchema.nullable(),
+    runId: StudyIdentifierSchema.nullable(),
+    issuedAt: z.number().int().nonnegative(),
+    expiresAt: z.number().int().positive(),
+  })
+  .strict();
+
+export const StudySessionIssueResponseSchema = z
+  .object({
+    token: z.string().min(32).max(4_096),
+    claims: StudySessionClaimsSchema,
+    expiresAt: z.string().datetime(),
+  })
+  .strict();
 
 export const ProjectFlowProjectSchema = z.object({
   id: StudyIdentifierSchema,
@@ -921,12 +991,18 @@ export type TelemetryEventType = z.infer<typeof TelemetryEventTypeSchema>;
 export type TelemetryEvent = z.infer<typeof TelemetryEventSchema>;
 export type StudyTelemetrySource = z.infer<typeof StudyTelemetrySourceSchema>;
 export type ViewportClass = z.infer<typeof ViewportClassSchema>;
+export type DarwinProvenance = z.infer<typeof DarwinProvenanceSchema>;
 export type StudyTelemetryEvent = z.infer<typeof StudyTelemetryEventSchema>;
 export type TelemetryBatch = z.infer<typeof TelemetryBatchSchema>;
 export type TelemetryReceipt = z.infer<typeof TelemetryReceiptSchema>;
 export type StoredTelemetryEvent = z.infer<typeof StoredTelemetryEventSchema>;
 export type StudyEventsResponse = z.infer<typeof StudyEventsResponseSchema>;
 export type StudySessionResponse = z.infer<typeof StudySessionResponseSchema>;
+export type StudyEvidenceClass = z.infer<typeof StudyEvidenceClassSchema>;
+export type StudySessionClaims = z.infer<typeof StudySessionClaimsSchema>;
+export type StudySessionIssueResponse = z.infer<
+  typeof StudySessionIssueResponseSchema
+>;
 export type ProjectFlowProject = z.infer<typeof ProjectFlowProjectSchema>;
 export type ProjectFlowTask = z.infer<typeof ProjectFlowTaskSchema>;
 export type ProjectFlowWorkspace = z.infer<typeof ProjectFlowWorkspaceSchema>;
