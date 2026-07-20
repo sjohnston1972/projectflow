@@ -14,6 +14,25 @@ describe("standalone ProjectFlow", () => {
     ).toBeVisible();
   });
 
+  it("provides keyboard-operable navigation to My work", () => {
+    window.history.replaceState({}, "", "/study/dashboard");
+    const { container } = render(<App />);
+    const myWork = screen.getByRole("button", { name: "My work" });
+
+    expect(myWork).toHaveAttribute("type", "button");
+    expect(myWork).toBeEnabled();
+    expect(
+      container.querySelector('[data-darwin-id="nav-my-work"]'),
+    ).toBe(myWork);
+
+    myWork.focus();
+    expect(myWork).toHaveFocus();
+    fireEvent.click(myWork, { detail: 0 });
+
+    expect(window.location.pathname).toBe("/study/my-work");
+    expect(screen.getByRole("heading", { name: "My Work" })).toBeVisible();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState({}, "", "/");

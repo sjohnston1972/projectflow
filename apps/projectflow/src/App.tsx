@@ -591,6 +591,13 @@ export function App() {
             onClick={() => navigate("dashboard")}
           />
           <NavItem
+            active={route === "my-work"}
+            icon={ListChecks}
+            id="nav-my-work"
+            label="My work"
+            onClick={() => navigate("my-work")}
+          />
+          <NavItem
             active={route === "projects" || route.startsWith("project")}
             count={projects.length}
             icon={FolderKanban}
