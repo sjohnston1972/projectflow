@@ -170,4 +170,32 @@ describe("standalone ProjectFlow", () => {
     ).toBeVisible();
     expect(screen.getByLabelText("Search project tasks")).toBeVisible();
   });
+
+  it("captures privacy-safe intent across Settings and route whitespace", () => {
+    window.history.replaceState({}, "", "/study");
+    const { container } = render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
+    const workspaceName = container.querySelector<HTMLElement>(
+      '[data-darwin-id="settings-workspace-name"]',
+    );
+    const settingsContent = container.querySelector<HTMLElement>(
+      '[data-darwin-id="workspace-settings-content"]',
+    );
+
+    expect(workspaceName).not.toBeNull();
+    expect(settingsContent).not.toBeNull();
+    fireEvent.pointerOver(workspaceName!, { pointerType: "mouse" });
+    fireEvent.click(workspaceName!);
+    fireEvent.pointerOut(workspaceName!, { pointerType: "mouse" });
+    fireEvent.click(settingsContent!);
+
+    expect(screen.getAllByText(/settings-workspace-name/).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/workspace-settings-content/).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText("false affordance").length).toBeGreaterThan(0);
+  });
 });
