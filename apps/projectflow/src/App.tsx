@@ -615,7 +615,7 @@ export function App() {
         </nav>
 
         <div className="sidebar-spacer" />
-        <div className="account">
+        <div className="account" data-darwin-id="sidebar-account-profile">
           <span className="avatar">AM</span>
           <span>
             <strong>{participantName}</strong>
@@ -628,6 +628,7 @@ export function App() {
         <button
           className="nav-scrim"
           type="button"
+          data-darwin-id="mobile-navigation-close"
           aria-label="Close navigation"
           onClick={() => setMobileNavOpen(false)}
         />
@@ -638,12 +639,13 @@ export function App() {
           <button
             className="icon-button mobile-menu"
             type="button"
+            data-darwin-id="mobile-navigation-open"
             aria-label="Open navigation"
             onClick={() => setMobileNavOpen(true)}
           >
             <Menu size={19} />
           </button>
-          <div className="breadcrumb">
+          <div className="breadcrumb" data-darwin-id="workspace-breadcrumb">
             <span>Northstar Labs</span>
             <ChevronRight size={14} />
             <strong>{routeTitle(route, selectedProject)}</strong>
@@ -662,16 +664,19 @@ export function App() {
             <button
               className="icon-button"
               type="button"
+              data-darwin-id="notifications-open"
               aria-label="Notifications"
             >
               <Bell size={18} />
               <span className="notification-dot" />
             </button>
-            <CircleUserRound size={24} />
+            <span data-darwin-id="topbar-account-profile">
+              <CircleUserRound size={24} />
+            </span>
           </div>
         </header>
 
-        <main className="content">
+        <main className="content" data-darwin-id={`workspace-${route}-content`}>
           {route === "dashboard" && (
             <Dashboard
               projects={projects}
@@ -747,16 +752,27 @@ export function App() {
           <form className="form-stack" onSubmit={createProject}>
             <label>
               Project name
-              <input name="name" placeholder="e.g. Polaris Launch" autoFocus />
+              <input
+                name="name"
+                placeholder="e.g. Polaris Launch"
+                data-darwin-id="project-name-input"
+                autoFocus
+              />
             </label>
             <label>
               Target date
-              <input name="date" type="date" defaultValue="2026-08-30" />
+              <input
+                name="date"
+                type="date"
+                defaultValue="2026-08-30"
+                data-darwin-id="project-target-date-input"
+              />
             </label>
             <div className="modal-actions">
               <button
                 type="button"
                 className="button-secondary"
+                data-darwin-id="project-create-cancel"
                 onClick={() => setShowProjectForm(false)}
               >
                 Cancel
@@ -784,12 +800,17 @@ export function App() {
               <input
                 name="title"
                 placeholder="What needs to be done?"
+                data-darwin-id="task-title-input"
                 autoFocus
               />
             </label>
             <label>
               Assignee
-              <select name="assignee" defaultValue={participantName}>
+              <select
+                name="assignee"
+                defaultValue={participantName}
+                data-darwin-id="task-assignee-input"
+              >
                 <option>{participantName}</option>
                 <option>Priya Shah</option>
                 <option>Marcus Chen</option>
@@ -799,6 +820,7 @@ export function App() {
               <button
                 type="button"
                 className="button-secondary"
+                data-darwin-id="task-create-cancel"
                 onClick={() => setShowTaskForm(false)}
               >
                 Cancel
@@ -897,7 +919,10 @@ function Dashboard({
         />
       </div>
       <div className="dashboard-grid">
-        <section className="panel wide-panel">
+        <section
+          className="panel wide-panel"
+          data-darwin-id="dashboard-project-health-panel"
+        >
           <PanelHeading title="Project health" meta="All projects" />
           <div className="project-health-list">
             {projects.map((project) => (
@@ -1016,7 +1041,10 @@ function MyWork({
         title="My Work"
         description="Priorities across every active project, in one place."
       />
-      <section className="panel my-work-panel">
+      <section
+        className="panel my-work-panel"
+        data-darwin-id="my-work-assigned-panel"
+      >
         <PanelHeading title="Assigned tasks" meta={`${tasks.length} visible`} />
         <div className="my-work-list">
           {tasks.map((task) => (
@@ -1073,12 +1101,16 @@ function Projects({
           </button>
         }
       />
-      <section className="panel table-panel">
+      <section
+        className="panel table-panel"
+        data-darwin-id="projects-directory-panel"
+      >
         <div className="table-toolbar">
           <form className="search-field" onSubmit={onSearch}>
             <Search size={16} />
             <input
               aria-label="Search projects"
+              data-darwin-id="project-search-input"
               value={query}
               onChange={(event) => onChangeQuery(event.target.value)}
               placeholder="Search projects"
@@ -1137,7 +1169,11 @@ function ProjectOverview({
         description={`Owned by ${project.owner} - Due ${project.dueDate}`}
       />
       <div className="project-tabs">
-        <button className="is-active" type="button">
+        <button
+          className="is-active"
+          type="button"
+          data-darwin-id="project-overview-tab"
+        >
           Overview
         </button>
         <button
@@ -1147,11 +1183,18 @@ function ProjectOverview({
         >
           Tasks <span>{tasks.length}</span>
         </button>
-        <button type="button">Files</button>
-        <button type="button">Activity</button>
+        <button type="button" data-darwin-id="project-files-tab">
+          Files
+        </button>
+        <button type="button" data-darwin-id="project-activity-tab">
+          Activity
+        </button>
       </div>
       <div className="project-overview-grid">
-        <section className="panel progress-panel">
+        <section
+          className="panel progress-panel"
+          data-darwin-id="project-delivery-progress-panel"
+        >
           <PanelHeading title="Delivery progress" meta="Current sprint" />
           <strong>
             {Math.round(
@@ -1169,7 +1212,7 @@ function ProjectOverview({
             {tasks.length} tasks completed
           </p>
         </section>
-        <section className="panel">
+        <section className="panel" data-darwin-id="project-status-panel">
           <PanelHeading title="Project status" />
           <Status value={project.status} />
           <p className="panel-copy">
@@ -1177,14 +1220,20 @@ function ProjectOverview({
             dependencies.
           </p>
         </section>
-        <section className="panel wide-panel">
+        <section
+          className="panel wide-panel"
+          data-darwin-id="project-recent-tasks-panel"
+        >
           <PanelHeading
             title="Recent tasks"
             meta="Open task directory from the Tasks tab"
           />
           <div className="compact-task-list">
             {tasks.slice(0, 3).map((task) => (
-              <div key={task.id}>
+              <div
+                key={task.id}
+                data-darwin-id={`project-recent-task-${task.id.toLowerCase()}`}
+              >
                 <span className="task-check" />
                 <span>
                   <strong>{task.title}</strong>
@@ -1234,12 +1283,16 @@ function ProjectTasks({
           </button>
         }
       />
-      <section className="panel table-panel">
+      <section
+        className="panel table-panel"
+        data-darwin-id="project-task-directory-panel"
+      >
         <div className="table-toolbar">
           <form className="search-field" onSubmit={onSearch}>
             <Search size={16} />
             <input
               aria-label="Search project tasks"
+              data-darwin-id="project-task-search-input"
               value={query}
               onChange={(event) => onChangeQuery(event.target.value)}
               placeholder="Search this project's tasks"
@@ -1292,7 +1345,10 @@ function Reports({
         description="Portfolio trends and delivery exceptions."
       />
       <div className="report-grid">
-        <section className="panel report-feature">
+        <section
+          className="panel report-feature"
+          data-darwin-id="report-delivery-exception"
+        >
           <div className="report-icon coral">
             <AlertTriangle size={20} />
           </div>
@@ -1307,7 +1363,7 @@ function Reports({
             Open overdue report <ChevronRight size={15} />
           </button>
         </section>
-        <section className="panel">
+        <section className="panel" data-darwin-id="report-throughput">
           <div className="report-icon blue">
             <BarChart3 size={20} />
           </div>
@@ -1315,7 +1371,7 @@ function Reports({
           <strong>42 tasks completed</strong>
           <p>Up 8% from the previous sprint.</p>
         </section>
-        <section className="panel">
+        <section className="panel" data-darwin-id="report-quality">
           <div className="report-icon green">
             <ListChecks size={20} />
           </div>
@@ -1336,17 +1392,20 @@ function SettingsView() {
         title="Settings"
         description="Manage workspace preferences and integrations."
       />
-      <section className="panel settings-panel">
+      <section
+        className="panel settings-panel"
+        data-darwin-id="settings-workspace-profile"
+      >
         <h2>Workspace profile</h2>
-        <div>
+        <div data-darwin-id="settings-workspace-name">
           <span>Workspace</span>
           <strong>Northstar Labs</strong>
         </div>
-        <div>
+        <div data-darwin-id="settings-default-timezone">
           <span>Default timezone</span>
           <strong>Europe/London</strong>
         </div>
-        <div>
+        <div data-darwin-id="settings-active-members">
           <span>Members</span>
           <strong>24 active</strong>
         </div>
@@ -1549,6 +1608,7 @@ function Modal({
           <button
             type="button"
             className="icon-button"
+            data-darwin-id="modal-close"
             aria-label="Close"
             onClick={onClose}
           >
