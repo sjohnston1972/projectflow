@@ -590,6 +590,18 @@ export function App() {
             label="Dashboard"
             onClick={() => navigate("dashboard")}
           />
+          <a
+            className={`nav-item ${route === "my-work" ? "is-active" : ""}`}
+            href="/study/my-work"
+            data-darwin-id="nav-my-work"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate("my-work");
+            }}
+          >
+            <ListChecks size={17} />
+            <span>My work</span>
+          </a>
           <NavItem
             active={route === "projects" || route.startsWith("project")}
             count={projects.length}

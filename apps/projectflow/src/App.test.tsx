@@ -78,6 +78,21 @@ describe("standalone ProjectFlow", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("links directly from the primary navigation to My work", () => {
+    window.history.replaceState({}, "", "/study/dashboard");
+    render(<App />);
+
+    const link = screen.getByRole("link", { name: "My work" });
+    expect(link).toHaveAttribute("href", "/study/my-work");
+
+    link.focus();
+    expect(link).toHaveFocus();
+    fireEvent.click(link);
+
+    expect(window.location.pathname).toBe("/study/my-work");
+    expect(screen.getByRole("heading", { name: "My Work" })).toBeVisible();
+  });
+
   it("runs a configurable Darwin Lab task without a target-side oracle", () => {
     window.history.replaceState(
       {},
