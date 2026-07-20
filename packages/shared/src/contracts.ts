@@ -1,33 +1,33 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const PersonaSchema = z.enum([
-  'project_manager',
-  'developer',
-  'executive',
-  'administrator',
+  "project_manager",
+  "developer",
+  "executive",
+  "administrator",
 ]);
 
-export const OrganismVariantSchema = z.enum(['baseline', 'evolved']);
+export const OrganismVariantSchema = z.enum(["baseline", "evolved"]);
 
 export const WorkflowGoalSchema = z.enum([
-  'find_assigned_tasks',
-  'create_task',
-  'update_task',
-  'review_project_health',
-  'review_reports',
-  'manage_members',
-  'configure_workspace',
+  "find_assigned_tasks",
+  "create_task",
+  "update_task",
+  "review_project_health",
+  "review_reports",
+  "manage_members",
+  "configure_workspace",
 ]);
 
 export const TelemetryEventTypeSchema = z.enum([
-  'page_view',
-  'click',
-  'search',
-  'workflow_started',
-  'workflow_completed',
-  'workflow_abandoned',
-  'validation_error',
-  'backtrack',
+  "page_view",
+  "click",
+  "search",
+  "workflow_started",
+  "workflow_completed",
+  "workflow_abandoned",
+  "validation_error",
+  "backtrack",
 ]);
 
 export const TelemetryEventSchema = z.object({
@@ -55,7 +55,7 @@ const StudyRouteSchema = z
   .max(256)
   .regex(
     /^\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[A-Fa-f0-9]{2})*(?:\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[A-Fa-f0-9]{2})+)*\/?$/,
-    'Route must be a safe application pathname without query, fragment, whitespace, or control characters.',
+    "Route must be a safe application pathname without query, fragment, whitespace, or control characters.",
   );
 const SemanticTargetSchema = z
   .string()
@@ -64,39 +64,45 @@ const SemanticTargetSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
 export const StudyTelemetrySourceSchema = z.enum([
-  'real_user',
-  'automated',
-  'synthetic',
+  "real_user",
+  "automated",
+  "synthetic",
 ]);
 
 export const DarwinProvenanceSchema = z
   .object({
     evidenceClass: z.enum([
-      'human_study',
-      'automated_study',
-      'darwin_lab',
-      'scale_replay',
-      'legacy',
+      "human_study",
+      "automated_study",
+      "darwin_lab",
+      "scale_replay",
+      "legacy",
     ]),
     label: z.string().min(1).max(48),
     labExperimentId: z.string().min(1).max(128).nullable(),
     taskDefinitionId: z.string().min(1).max(128).nullable(),
-    taskDefinitionHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    taskDefinitionHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable(),
     evidencePackId: z.string().min(1).max(128).nullable(),
-    evidenceHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    evidenceHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable(),
     runIds: z.array(z.string().min(1).max(128)).max(20),
   })
   .strict();
 
-export const ViewportClassSchema = z.enum(['mobile', 'tablet', 'desktop']);
-export const PointerTypeSchema = z.enum(['mouse', 'touch', 'pen', 'unknown']);
+export const ViewportClassSchema = z.enum(["mobile", "tablet", "desktop"]);
+export const PointerTypeSchema = z.enum(["mouse", "touch", "pen", "unknown"]);
 
 export const InteractionSignalTypeSchema = z.enum([
-  'rage_click',
-  'false_affordance',
-  'unexpected_double_click',
-  'element_indecision',
-  'cursor_thrashing',
+  "rage_click",
+  "false_affordance",
+  "unexpected_double_click",
+  "element_indecision",
+  "cursor_thrashing",
 ]);
 
 const StudyEventBaseSchema = z
@@ -117,20 +123,20 @@ const StudyEventBaseSchema = z
   .strict();
 
 export const SessionStartedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('session_started'),
+  eventType: z.literal("session_started"),
 });
 
 export const SessionEndedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('session_ended'),
+  eventType: z.literal("session_ended"),
   durationMs: z.number().int().nonnegative(),
 });
 
 export const PageViewEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('page_view'),
+  eventType: z.literal("page_view"),
 });
 
 export const ElementClickedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('element_clicked'),
+  eventType: z.literal("element_clicked"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -148,7 +154,7 @@ export const ElementClickedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const HoverStartedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('hover_started'),
+  eventType: z.literal("hover_started"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -156,7 +162,7 @@ export const HoverStartedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const HoverEndedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('hover_ended'),
+  eventType: z.literal("hover_ended"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -172,7 +178,7 @@ export const HoverEndedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const PointerTransitionEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('pointer_transition'),
+  eventType: z.literal("pointer_transition"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -186,7 +192,7 @@ export const PointerTransitionEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const InteractionSignalEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('interaction_signal'),
+  eventType: z.literal("interaction_signal"),
   targetId: SemanticTargetSchema.optional(),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -202,7 +208,7 @@ export const InteractionSignalEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const DragAttemptedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('drag_attempted'),
+  eventType: z.literal("drag_attempted"),
   targetId: SemanticTargetSchema.optional(),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -216,20 +222,20 @@ export const DragAttemptedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const TouchCancelledEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('touch_cancelled'),
+  eventType: z.literal("touch_cancelled"),
   targetId: SemanticTargetSchema.optional(),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
   properties: z
     .object({
-      pointerType: z.literal('touch'),
+      pointerType: z.literal("touch"),
       durationMs: z.number().int().nonnegative().max(600_000),
     })
     .strict(),
 });
 
 export const RouteChangedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('route_changed'),
+  eventType: z.literal("route_changed"),
   properties: z
     .object({
       fromRoute: StudyRouteSchema,
@@ -238,12 +244,12 @@ export const RouteChangedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const BrowserNavigationEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('browser_navigation'),
+  eventType: z.literal("browser_navigation"),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
   properties: z
     .object({
-      direction: z.enum(['back', 'forward']),
+      direction: z.enum(["back", "forward"]),
       fromRoute: StudyRouteSchema,
       toRoute: StudyRouteSchema,
     })
@@ -251,7 +257,7 @@ export const BrowserNavigationEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const ViewportZoomChangedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('viewport_zoom_changed'),
+  eventType: z.literal("viewport_zoom_changed"),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
   properties: z
@@ -263,7 +269,7 @@ export const ViewportZoomChangedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const ValidationErrorEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('validation_error'),
+  eventType: z.literal("validation_error"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -276,7 +282,7 @@ export const ValidationErrorEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const SearchPerformedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('search_performed'),
+  eventType: z.literal("search_performed"),
   targetId: SemanticTargetSchema,
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
@@ -289,29 +295,29 @@ export const SearchPerformedEventSchema = StudyEventBaseSchema.extend({
 });
 
 export const TaskStartedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('task_started'),
+  eventType: z.literal("task_started"),
   taskAttemptId: StudyIdentifierSchema,
   taskId: StudyIdentifierSchema,
 });
 
 export const TaskCompletedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('task_completed'),
+  eventType: z.literal("task_completed"),
   taskAttemptId: StudyIdentifierSchema,
   taskId: StudyIdentifierSchema,
   durationMs: z.number().int().nonnegative(),
-  outcome: z.literal('success'),
+  outcome: z.literal("success"),
 });
 
 export const TaskFailedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('task_failed'),
+  eventType: z.literal("task_failed"),
   taskAttemptId: StudyIdentifierSchema,
   taskId: StudyIdentifierSchema,
   durationMs: z.number().int().nonnegative(),
-  outcome: z.enum(['failed', 'abandoned']),
+  outcome: z.enum(["failed", "abandoned"]),
 });
 
 export const FeedbackSubmittedEventSchema = StudyEventBaseSchema.extend({
-  eventType: z.literal('feedback_submitted'),
+  eventType: z.literal("feedback_submitted"),
   taskAttemptId: StudyIdentifierSchema.optional(),
   taskId: StudyIdentifierSchema.optional(),
   properties: z
@@ -321,7 +327,7 @@ export const FeedbackSubmittedEventSchema = StudyEventBaseSchema.extend({
     .strict(),
 });
 
-export const StudyTelemetryEventSchema = z.discriminatedUnion('eventType', [
+export const StudyTelemetryEventSchema = z.discriminatedUnion("eventType", [
   SessionStartedEventSchema,
   SessionEndedEventSchema,
   PageViewEventSchema,
@@ -353,10 +359,11 @@ export const TelemetryReceiptSchema = z.object({
   accepted: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
   duplicates: z.number().int().nonnegative().default(0),
+  sequenceConflicts: z.number().int().nonnegative().default(0),
 });
 
 const storedAt = { receivedAt: z.string().datetime() };
-export const StoredTelemetryEventSchema = z.discriminatedUnion('eventType', [
+export const StoredTelemetryEventSchema = z.discriminatedUnion("eventType", [
   SessionStartedEventSchema.extend(storedAt),
   SessionEndedEventSchema.extend(storedAt),
   PageViewEventSchema.extend(storedAt),
@@ -441,7 +448,7 @@ export const ProjectFlowProjectSchema = z.object({
   name: z.string().min(1).max(120),
   code: z.string().min(1).max(8),
   owner: z.string().min(1).max(80),
-  status: z.enum(['On track', 'At risk', 'Overdue']),
+  status: z.enum(["On track", "At risk", "Overdue"]),
   dueDate: z.string().min(1).max(32),
 });
 
@@ -450,7 +457,7 @@ export const ProjectFlowTaskSchema = z.object({
   projectId: StudyIdentifierSchema,
   title: z.string().min(1).max(160),
   assignee: z.string().min(1).max(80),
-  status: z.enum(['To do', 'In progress', 'Done']),
+  status: z.enum(["To do", "In progress", "Done"]),
   dueDate: z.string().min(1).max(32),
 });
 
@@ -467,10 +474,10 @@ export const ParticipantWorkspaceResponseSchema = z.object({
 });
 
 export const EvidenceClassSchema = z.enum([
-  'measured',
-  'automated',
-  'predicted',
-  'synthetic',
+  "measured",
+  "automated",
+  "predicted",
+  "synthetic",
 ]);
 
 export const TaskAttemptSchema = z.object({
@@ -480,7 +487,7 @@ export const TaskAttemptSchema = z.object({
   sessionId: StudyIdentifierSchema,
   appVersion: z.string().min(1),
   source: StudyTelemetrySourceSchema,
-  outcome: z.enum(['success', 'failed', 'abandoned', 'open']),
+  outcome: z.enum(["success", "failed", "abandoned", "open"]),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
   durationMs: z.number().int().nonnegative().nullable(),
@@ -490,20 +497,20 @@ export const TaskAttemptSchema = z.object({
 });
 
 export const FrictionRuleSchema = z.enum([
-  'navigation_loop',
-  'repeated_target',
-  'task_abandonment',
-  'excess_path_length',
-  'validation_friction',
-  'search_dependency',
-  'rage_click',
-  'false_affordance',
-  'hover_hesitation',
-  'cursor_indecision',
-  'drag_expectation',
-  'touch_conflict',
-  'browser_back_dependency',
-  'zoom_readability',
+  "navigation_loop",
+  "repeated_target",
+  "task_abandonment",
+  "excess_path_length",
+  "validation_friction",
+  "search_dependency",
+  "rage_click",
+  "false_affordance",
+  "hover_hesitation",
+  "cursor_indecision",
+  "drag_expectation",
+  "touch_conflict",
+  "browser_back_dependency",
+  "zoom_readability",
 ]);
 
 export const EvidenceTraceEventSchema = z.object({
@@ -534,14 +541,14 @@ export const EvidenceJourneyEventSchema = z.object({
 export const EvidenceJourneySchema = z.object({
   journeyId: z.string().regex(/^J-\d{3}$/),
   appVersion: z.string().min(1),
-  source: z.enum(['real_user', 'automated']),
+  source: z.enum(["real_user", "automated"]),
   viewport: ViewportClassSchema,
   eventCount: z.number().int().positive(),
   events: z.array(EvidenceJourneyEventSchema).min(1).max(500),
 });
 
 export const EvidenceQualitySchema = z.object({
-  strength: z.enum(['insufficient', 'directional', 'substantial']),
+  strength: z.enum(["insufficient", "directional", "substantial"]),
   score: z.number().int().min(0).max(100),
   eventCount: z.number().int().nonnegative(),
   sessionCount: z.number().int().nonnegative(),
@@ -553,8 +560,8 @@ export const EvidenceQualitySchema = z.object({
 export const EvidenceSignalSchema = z.object({
   evidenceId: z.string().regex(/^EV-\d{3}$/),
   ruleId: FrictionRuleSchema,
-  ruleVersion: z.enum(['1.0.0', '1.1.0', '1.2.0']),
-  severity: z.enum(['low', 'medium', 'high']),
+  ruleVersion: z.enum(["1.0.0", "1.1.0", "1.2.0"]),
+  severity: z.enum(["low", "medium", "high"]),
   taskId: StudyIdentifierSchema.optional(),
   summary: z.string().min(1),
   affectedAttemptIds: z.array(StudyIdentifierSchema),
@@ -588,7 +595,7 @@ export const EvidencePackSchema = z.object({
   evidenceId: StudyIdentifierSchema,
   evidenceHash: z.string().regex(/^[a-f0-9]{64}$/),
   generatedAt: z.string().datetime(),
-  parserVersion: z.enum(['1.0.0', '1.1.0', '1.2.0']),
+  parserVersion: z.enum(["1.0.0", "1.1.0", "1.2.0"]),
   evidenceClass: EvidenceClassSchema,
   study: z.object({
     studyId: StudyIdentifierSchema,
@@ -605,7 +612,7 @@ export const EvidencePackSchema = z.object({
   frictionSignals: z.array(EvidenceSignalSchema),
   applicationMap: z.object({
     product: z.object({
-      name: z.literal('ProjectFlow'),
+      name: z.literal("ProjectFlow"),
       purpose: z.string().min(1),
       primaryUser: z.string().min(1),
       domainEntities: z.array(z.string().min(1)).min(1),
@@ -642,7 +649,7 @@ export const EvidenceMutationCandidateSchema = z.object({
   change: z.string().min(1),
   predictedImpact: z.object({
     metric: z.string().min(1),
-    direction: z.enum(['increase', 'decrease']),
+    direction: z.enum(["increase", "decrease"]),
     rationale: z.string().min(1),
   }),
   confidence: z.number().min(0).max(1),
@@ -681,14 +688,14 @@ export const EvidenceAnalysisSchema = z.object({
   evidenceId: StudyIdentifierSchema,
   evidenceHash: z.string().regex(/^[a-f0-9]{64}$/),
   cacheKey: z.string().regex(/^[a-f0-9]{64}$/),
-  promptVersion: z.enum(['1.0.0', '1.1.0', '2.0.0', '2.1.0']),
-  mode: z.literal('live'),
+  promptVersion: z.enum(["1.0.0", "1.1.0", "2.0.0", "2.1.0"]),
+  mode: z.literal("live"),
   model: z.string().min(1),
   promptCache: z
     .object({
       key: z.string().min(1).max(64),
       contextVersion: z.string().min(1),
-      retention: z.literal('24h'),
+      retention: z.literal("24h"),
       cachedTokens: z.number().int().nonnegative().optional(),
     })
     .optional(),
@@ -716,7 +723,7 @@ export const CodexImplementationManifestSchema = z.object({
   mutationId: StudyIdentifierSchema,
   mutationIds: z.array(StudyIdentifierSchema).min(1).max(6).optional(),
   evidenceHash: z.string().regex(/^[a-f0-9]{64}$/),
-  promptVersion: z.enum(['1.0.0', '1.1.0', '2.0.0', '2.1.0']),
+  promptVersion: z.enum(["1.0.0", "1.1.0", "2.0.0", "2.1.0"]),
   repositoryCommit: z.string().min(1),
   createdAt: z.string().datetime(),
   brief: z.string().min(1),
@@ -735,12 +742,12 @@ export const CodexManifestRequestSchema = z
       .min(1)
       .max(6)
       .refine((ids) => new Set(ids).size === ids.length, {
-        message: 'Mutation IDs must be unique.',
+        message: "Mutation IDs must be unique.",
       })
       .optional(),
   })
   .refine((request) => !(request.mutationId && request.mutationIds), {
-    message: 'Use mutationId or mutationIds, not both.',
+    message: "Use mutationId or mutationIds, not both.",
   });
 
 export const OutcomeCohortSchema = z.object({
@@ -748,7 +755,7 @@ export const OutcomeCohortSchema = z.object({
   studyId: StudyIdentifierSchema,
   variant: OrganismVariantSchema,
   appVersion: z.string().min(1),
-  source: z.literal('automated'),
+  source: z.literal("automated"),
   evidenceId: StudyIdentifierSchema,
   evidenceHash: z.string().regex(/^[a-f0-9]{64}$/),
   taskId: StudyIdentifierSchema,
@@ -761,8 +768,8 @@ export const OutcomeCohortSchema = z.object({
 
 export const OutcomeValidationSchema = z.object({
   validationId: StudyIdentifierSchema,
-  evidenceClass: z.literal('automated'),
-  provenance: z.enum(['live_automated_run', 'recorded_automated_run']),
+  evidenceClass: z.literal("automated"),
+  provenance: z.enum(["live_automated_run", "recorded_automated_run"]),
   generatedAt: z.string().datetime(),
   taskId: StudyIdentifierSchema,
   baseline: OutcomeCohortSchema,
@@ -795,7 +802,7 @@ export const SimulationRunSchema = z.object({
 
 export const SimulationRequestSchema = z.object({
   seed: z.number().int().default(1859),
-  variant: OrganismVariantSchema.default('baseline'),
+  variant: OrganismVariantSchema.default("baseline"),
 });
 
 export const SimulationMetricsSchema = z.object({
@@ -811,14 +818,14 @@ export const SimulationMetricsSchema = z.object({
 
 export const FrictionSignalSchema = z.object({
   key: z.enum([
-    'workflow_abandonment',
-    'navigation_overhead',
-    'backtracking',
-    'search_dependency',
-    'validation_errors',
+    "workflow_abandonment",
+    "navigation_overhead",
+    "backtracking",
+    "search_dependency",
+    "validation_errors",
   ]),
   value: z.number().nonnegative(),
-  unit: z.enum(['rate', 'events_per_workflow', 'page_views', 'count']),
+  unit: z.enum(["rate", "events_per_workflow", "page_views", "count"]),
 });
 
 export const SimulationSummarySchema = z.object({
@@ -861,9 +868,9 @@ export const MutationProposalSchema = z.object({
   implementationSummary: z.string().min(1),
   predictedFitnessGain: z.number(),
   confidence: z.number().min(0).max(1),
-  risk: z.enum(['low', 'medium', 'high']),
+  risk: z.enum(["low", "medium", "high"]),
   affectedFiles: z.array(z.string().min(1)).min(1),
-  status: z.enum(['proposed', 'approved', 'rejected', 'validated', 'released']),
+  status: z.enum(["proposed", "approved", "rejected", "validated", "released"]),
 });
 
 export const FitnessComparisonSchema = z.object({
@@ -876,13 +883,13 @@ export const EvolutionAnalysisRequestSchema = z.object({
   simulationId: z.string().min(1),
 });
 
-export const AnalysisModeSchema = z.literal('live');
+export const AnalysisModeSchema = z.literal("live");
 
 export const AnalysisFailureReasonSchema = z.enum([
-  'missing_api_key',
-  'timeout',
-  'api_error',
-  'invalid_response',
+  "missing_api_key",
+  "timeout",
+  "api_error",
+  "invalid_response",
 ]);
 
 export const EvolutionAnalysisResponseSchema = z.object({
@@ -907,20 +914,20 @@ export const MutationDecisionResponseSchema = z.object({
 });
 
 export const DemoResetResponseSchema = z.object({
-  status: z.literal('reset'),
+  status: z.literal("reset"),
   organism: OrganismStateSchema,
 });
 
 export const ValidationResultSchema = z.object({
   id: z.string().min(1),
   mutationId: z.string().min(1),
-  status: z.enum(['passed', 'failed']),
-  source: z.literal('recorded_repository_run'),
+  status: z.enum(["passed", "failed"]),
+  source: z.literal("recorded_repository_run"),
   commit: z.string().min(1),
   checks: z.array(
     z.object({
       name: z.string().min(1),
-      status: z.enum(['passed', 'failed']),
+      status: z.enum(["passed", "failed"]),
       durationMs: z.number().int().nonnegative(),
       output: z.string(),
     }),
@@ -933,14 +940,14 @@ export const EvolutionRecordSchema = z.object({
   id: z.string().min(1),
   version: z.string().min(1),
   mutationId: z.string().min(1).optional(),
-  outcome: z.enum(['baseline', 'survived', 'failed_selection']),
+  outcome: z.enum(["baseline", "survived", "failed_selection"]),
   fitness: FitnessBreakdownSchema,
   recordedAt: z.string().datetime(),
 });
 
 export const MutationDiffSchema = z.object({
   mutationId: z.string().min(1),
-  source: z.literal('repository_source_comparison'),
+  source: z.literal("repository_source_comparison"),
   baseRef: z.string().min(1),
   targetRef: z.string().min(1),
   patch: z.string().min(1),
@@ -960,7 +967,7 @@ export const MutationReleaseResponseSchema = z.object({
 
 export const ManifestExecutionResponseSchema = z.object({
   manifestId: StudyIdentifierSchema,
-  stage: z.enum(['approved', 'validated', 'released']),
+  stage: z.enum(["approved", "validated", "released"]),
   analysis: EvolutionAnalysisResponseSchema,
   diff: MutationDiffSchema,
   validation: ValidationResultSchema.nullable(),
@@ -973,11 +980,11 @@ export const EvolutionTimelineResponseSchema = z.object({
 });
 
 export const HealthResponseSchema = z.object({
-  status: z.literal('ok'),
-  service: z.literal('darwin-api'),
+  status: z.literal("ok"),
+  service: z.literal("darwin-api"),
   version: z.string().min(1),
   analysis: z.object({
-    mode: z.literal('live'),
+    mode: z.literal("live"),
     model: z.string().min(1),
     liveModelAvailable: z.boolean(),
   }),

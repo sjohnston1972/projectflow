@@ -6,10 +6,10 @@ import {
   type TelemetryReceipt,
   type ViewportClass,
   type DarwinProvenance,
-} from '@darwin/shared';
+} from "@darwin/shared";
 
-type ClientSource = 'real_user' | 'automated' | 'synthetic';
-type TerminalOutcome = 'success' | 'failed' | 'abandoned';
+type ClientSource = "real_user" | "automated" | "synthetic";
+type TerminalOutcome = "success" | "failed" | "abandoned";
 
 export interface TelemetryClientConfig {
   appVersion: string;
@@ -43,11 +43,11 @@ export interface TelemetryClientHealth {
 }
 
 export type TelemetryFlushResult =
-  | ({ status: 'delivered' } & TelemetryReceipt)
-  | { status: 'empty'; accepted: 0; rejected: 0 }
-  | { status: 'offline'; accepted: 0; rejected: 0 }
+  | ({ status: "delivered" } & TelemetryReceipt)
+  | { status: "empty"; accepted: 0; rejected: 0 }
+  | { status: "offline"; accepted: 0; rejected: 0 }
   | {
-      status: 'retrying';
+      status: "retrying";
       accepted: 0;
       rejected: 0;
       attempt: number;
@@ -60,7 +60,7 @@ interface ActiveAttempt {
   startedAt: number;
 }
 
-type PointerKind = 'mouse' | 'touch' | 'pen' | 'unknown';
+type PointerKind = "mouse" | "touch" | "pen" | "unknown";
 
 interface HoverState {
   startedAt: number;
@@ -85,43 +85,68 @@ interface CursorState {
   directionY: number;
 }
 
-const storagePrefix = 'darwin:telemetry-outbox';
+const storagePrefix = "darwin:telemetry-outbox";
+const sequenceStoragePrefix = "darwin:telemetry-sequence";
+let fallbackIdCounter = 0;
+
+const fallbackUuid = () => {
+  const bytes = new Uint8Array(16);
+  const browserCrypto = globalThis.crypto;
+  if (typeof browserCrypto?.getRandomValues === "function") {
+    browserCrypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+    const view = new DataView(bytes.buffer);
+    const timestamp = Date.now();
+    view.setUint32(0, Math.floor(timestamp / 0x1_0000_0000));
+    view.setUint32(4, timestamp >>> 0);
+    view.setUint32(12, fallbackIdCounter++ >>> 0);
+  }
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const value = [...bytes]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+};
 
 const createId = (prefix?: string) => {
   const value =
-    typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : '00000000-0000-4000-8000-000000000001';
+    typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : fallbackUuid();
   return prefix ? `${prefix}-${value}` : value;
 };
 
 const getViewportClass = (): ViewportClass => {
-  if (window.innerWidth < 640) return 'mobile';
-  if (window.innerWidth < 1024) return 'tablet';
-  return 'desktop';
+  if (window.innerWidth < 640) return "mobile";
+  if (window.innerWidth < 1024) return "tablet";
+  return "desktop";
 };
 
 const normalizeRoute = (route: string) => {
   const path = route.trim();
-  return path.startsWith('/') ? path : `/${path}`;
+  return path.startsWith("/") ? path : `/${path}`;
 };
 
 const semanticTargetOf = (origin: EventTarget | null) =>
   origin instanceof Element
-    ? origin.closest<HTMLElement>('[data-darwin-id]')
+    ? origin.closest<HTMLElement>("[data-darwin-id]")
     : null;
 
 const pointerTypeOf = (event: MouseEvent | PointerEvent): PointerKind => {
-  const value = 'pointerType' in event ? event.pointerType : '';
-  return value === 'mouse' || value === 'touch' || value === 'pen'
+  const value = "pointerType" in event ? event.pointerType : "";
+  return value === "mouse" || value === "touch" || value === "pen"
     ? value
     : event instanceof MouseEvent
-      ? 'mouse'
-      : 'unknown';
+      ? "mouse"
+      : "unknown";
 };
 
 const isInteractive = (target: HTMLElement) =>
-  target.dataset.darwinInteractive === 'true' ||
+  target.dataset.darwinInteractive === "true" ||
   target.matches(
     'button, a[href], input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex]:not([tabindex="-1"])',
   );
@@ -143,6 +168,7 @@ export class DarwinTelemetryClient {
     random: () => number;
   };
   private readonly outboxKey: string;
+  private readonly sequenceKey: string;
   private readonly fetcher: typeof fetch;
   private outbox: StudyTelemetryEvent[];
   private currentRoute: string;
@@ -158,9 +184,10 @@ export class DarwinTelemetryClient {
   private storageFailures = 0;
   private deliveryFailures = 0;
   private lastDeliveryError: string | null = null;
-  private persistentStorageAvailable = true;
   private startedAt = Date.now();
   private initialized = false;
+  private sessionEnded = false;
+  private readonly beaconedEventIds = new Set<string>();
   private readonly hovers = new Map<string, HoverState>();
   private readonly clickHistory = new Map<string, number[]>();
   private readonly rageSignalAt = new Map<string, number>();
@@ -176,10 +203,11 @@ export class DarwinTelemetryClient {
   private lastZoomScale = 1;
 
   constructor(config: TelemetryClientConfig) {
+    const sessionId = config.sessionId ?? createId("session");
     this.config = {
       ...config,
-      source: config.source ?? 'real_user',
-      sessionId: config.sessionId ?? createId('session'),
+      source: config.source ?? "real_user",
+      sessionId,
       flushIntervalMs: config.flushIntervalMs ?? 5_000,
       batchSize: Math.min(50, Math.max(1, config.batchSize ?? 20)),
       maxOutboxSize: Math.min(5_000, Math.max(2, config.maxOutboxSize ?? 500)),
@@ -195,31 +223,39 @@ export class DarwinTelemetryClient {
       config.initialRoute ?? window.location.pathname,
     );
     this.outboxKey = `${storagePrefix}:${config.studyId}:${config.participantId}`;
+    this.sequenceKey = `${sequenceStoragePrefix}:${config.studyId}:${config.participantId}:${sessionId}`;
     this.outbox = this.readOutbox();
+    this.sequence = Math.max(
+      this.readSequence(),
+      ...this.outbox
+        .filter((event) => event.sessionId === sessionId)
+        .map((event) => event.sequence + 1),
+    );
   }
 
   init() {
     if (this.initialized) return;
     this.initialized = true;
+    this.sessionEnded = false;
     this.startedAt = Date.now();
     this.basePixelRatio = window.devicePixelRatio || 1;
     this.baseViewportScale = window.visualViewport?.scale || 1;
     this.lastZoomScale = 1;
-    document.addEventListener('click', this.captureClick);
-    document.addEventListener('pointerover', this.capturePointerOver);
-    document.addEventListener('pointerout', this.capturePointerOut);
-    document.addEventListener('pointerdown', this.capturePointerDown);
-    document.addEventListener('pointermove', this.capturePointerMove);
-    document.addEventListener('pointerup', this.capturePointerUp);
-    document.addEventListener('pointercancel', this.capturePointerCancel);
-    document.addEventListener('touchcancel', this.captureTouchCancel);
-    document.addEventListener('visibilitychange', this.captureVisibility);
-    window.addEventListener('pagehide', this.capturePageHide);
-    window.addEventListener('resize', this.captureViewportZoom);
-    window.visualViewport?.addEventListener('resize', this.captureViewportZoom);
+    document.addEventListener("click", this.captureClick);
+    document.addEventListener("pointerover", this.capturePointerOver);
+    document.addEventListener("pointerout", this.capturePointerOut);
+    document.addEventListener("pointerdown", this.capturePointerDown);
+    document.addEventListener("pointermove", this.capturePointerMove);
+    document.addEventListener("pointerup", this.capturePointerUp);
+    document.addEventListener("pointercancel", this.capturePointerCancel);
+    document.addEventListener("touchcancel", this.captureTouchCancel);
+    document.addEventListener("visibilitychange", this.captureVisibility);
+    window.addEventListener("pagehide", this.capturePageHide);
+    window.addEventListener("resize", this.captureViewportZoom);
+    window.visualViewport?.addEventListener("resize", this.captureViewportZoom);
 
-    this.enqueue({ eventType: 'session_started' });
-    this.enqueue({ eventType: 'page_view' });
+    this.enqueue({ eventType: "session_started" });
+    this.enqueue({ eventType: "page_view" });
 
     if (this.config.endpoint) {
       this.flushTimer = window.setInterval(() => {
@@ -231,19 +267,19 @@ export class DarwinTelemetryClient {
   destroy() {
     if (!this.initialized) return;
     this.endSession();
-    document.removeEventListener('click', this.captureClick);
-    document.removeEventListener('pointerover', this.capturePointerOver);
-    document.removeEventListener('pointerout', this.capturePointerOut);
-    document.removeEventListener('pointerdown', this.capturePointerDown);
-    document.removeEventListener('pointermove', this.capturePointerMove);
-    document.removeEventListener('pointerup', this.capturePointerUp);
-    document.removeEventListener('pointercancel', this.capturePointerCancel);
-    document.removeEventListener('touchcancel', this.captureTouchCancel);
-    document.removeEventListener('visibilitychange', this.captureVisibility);
-    window.removeEventListener('pagehide', this.capturePageHide);
-    window.removeEventListener('resize', this.captureViewportZoom);
+    document.removeEventListener("click", this.captureClick);
+    document.removeEventListener("pointerover", this.capturePointerOver);
+    document.removeEventListener("pointerout", this.capturePointerOut);
+    document.removeEventListener("pointerdown", this.capturePointerDown);
+    document.removeEventListener("pointermove", this.capturePointerMove);
+    document.removeEventListener("pointerup", this.capturePointerUp);
+    document.removeEventListener("pointercancel", this.capturePointerCancel);
+    document.removeEventListener("touchcancel", this.captureTouchCancel);
+    document.removeEventListener("visibilitychange", this.captureVisibility);
+    window.removeEventListener("pagehide", this.capturePageHide);
+    window.removeEventListener("resize", this.captureViewportZoom);
     window.visualViewport?.removeEventListener(
-      'resize',
+      "resize",
       this.captureViewportZoom,
     );
     if (this.flushTimer !== null) window.clearInterval(this.flushTimer);
@@ -251,12 +287,11 @@ export class DarwinTelemetryClient {
     this.flushTimer = null;
     this.retryTimer = null;
     this.initialized = false;
-    this.flushWithBeacon();
   }
 
   trackPageView(route = this.currentRoute) {
     this.currentRoute = normalizeRoute(route);
-    this.enqueue({ eventType: 'page_view' });
+    this.enqueue({ eventType: "page_view" });
   }
 
   trackRouteChanged(route: string) {
@@ -265,19 +300,19 @@ export class DarwinTelemetryClient {
     if (nextRoute === fromRoute) return;
     this.currentRoute = nextRoute;
     this.enqueue({
-      eventType: 'route_changed',
+      eventType: "route_changed",
       properties: { fromRoute },
     });
-    this.enqueue({ eventType: 'page_view' });
+    this.enqueue({ eventType: "page_view" });
   }
 
   trackBrowserNavigation(
-    direction: 'back' | 'forward',
+    direction: "back" | "forward",
     fromRoute: string,
     toRoute: string,
   ) {
     this.enqueue({
-      eventType: 'browser_navigation',
+      eventType: "browser_navigation",
       ...this.attemptFields(),
       properties: {
         direction,
@@ -289,7 +324,7 @@ export class DarwinTelemetryClient {
 
   trackValidationError(targetId: string, fieldId: string, errorCode: string) {
     this.enqueue({
-      eventType: 'validation_error',
+      eventType: "validation_error",
       targetId,
       ...this.attemptFields(),
       properties: { fieldId, errorCode },
@@ -298,7 +333,7 @@ export class DarwinTelemetryClient {
 
   trackSearch(targetId: string, queryLength: number, resultCount: number) {
     this.enqueue({
-      eventType: 'search_performed',
+      eventType: "search_performed",
       targetId,
       ...this.attemptFields(),
       properties: { queryLength, resultCount },
@@ -306,30 +341,30 @@ export class DarwinTelemetryClient {
   }
 
   taskStarted(taskId: string) {
-    if (this.activeAttempt) this.taskCompleted('abandoned');
+    if (this.activeAttempt) this.taskCompleted("abandoned");
     const attempt: ActiveAttempt = {
-      id: createId('attempt'),
+      id: createId("attempt"),
       taskId,
       startedAt: Date.now(),
     };
     this.activeAttempt = attempt;
     this.enqueue({
-      eventType: 'task_started',
+      eventType: "task_started",
       taskAttemptId: attempt.id,
       taskId,
     });
     return attempt.id;
   }
 
-  taskCompleted(outcome: TerminalOutcome) {
+  taskCompleted(outcome: TerminalOutcome, flush = true) {
     if (!this.activeAttempt) return null;
     const attempt = this.activeAttempt;
     const durationMs = Math.max(0, Date.now() - attempt.startedAt);
     this.activeAttempt = null;
 
-    if (outcome === 'success') {
+    if (outcome === "success") {
       this.enqueue({
-        eventType: 'task_completed',
+        eventType: "task_completed",
         taskAttemptId: attempt.id,
         taskId: attempt.taskId,
         durationMs,
@@ -337,7 +372,7 @@ export class DarwinTelemetryClient {
       });
     } else {
       this.enqueue({
-        eventType: 'task_failed',
+        eventType: "task_failed",
         taskAttemptId: attempt.id,
         taskId: attempt.taskId,
         durationMs,
@@ -345,7 +380,7 @@ export class DarwinTelemetryClient {
       });
     }
 
-    if (this.config.endpoint) {
+    if (flush && this.config.endpoint) {
       void this.flush().catch(() => undefined);
     }
 
@@ -354,7 +389,7 @@ export class DarwinTelemetryClient {
 
   feedbackSubmitted(feedbackLength: number) {
     this.enqueue({
-      eventType: 'feedback_submitted',
+      eventType: "feedback_submitted",
       ...this.attemptFields(),
       properties: { length: Math.min(500, Math.max(0, feedbackLength)) },
     });
@@ -404,10 +439,10 @@ export class DarwinTelemetryClient {
 
   private async deliverNextBatch(): Promise<TelemetryFlushResult> {
     if (this.outbox.length === 0) {
-      return { status: 'empty', accepted: 0, rejected: 0 };
+      return { status: "empty", accepted: 0, rejected: 0 };
     }
     if (!this.config.endpoint) {
-      return { status: 'offline', accepted: 0, rejected: 0 };
+      return { status: "offline", accepted: 0, rejected: 0 };
     }
     if (Date.now() < this.nextRetryAt) return this.retryingResult();
 
@@ -415,11 +450,11 @@ export class DarwinTelemetryClient {
     const batch = TelemetryBatchSchema.parse({ events });
     try {
       const response = await this.fetcher(this.config.endpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...(this.config.studySessionToken
-            ? { 'X-Darwin-Study-Session': this.config.studySessionToken }
+            ? { "X-Darwin-Study-Session": this.config.studySessionToken }
             : {}),
         },
         body: JSON.stringify(batch),
@@ -428,34 +463,37 @@ export class DarwinTelemetryClient {
       if (!response.ok) {
         return this.scheduleRetry(
           `Telemetry delivery failed: ${response.status}`,
-          response.headers.get('Retry-After'),
+          response.headers.get("Retry-After"),
         );
       }
 
       const receipt = TelemetryReceiptSchema.parse(await response.json());
       if (
-        receipt.accepted + receipt.rejected + receipt.duplicates !==
+        receipt.accepted +
+          receipt.rejected +
+          receipt.duplicates +
+          receipt.sequenceConflicts !==
         events.length
       ) {
         return this.scheduleRetry(
-          'Telemetry receipt did not account for the complete batch.',
+          "Telemetry receipt did not account for the complete batch.",
         );
       }
       this.removeFromOutbox(events);
       this.clearRetryState();
       this.persistOutbox();
       this.notifyHealth();
-      return { status: 'delivered', ...receipt };
+      return { status: "delivered", ...receipt };
     } catch (error) {
       return this.scheduleRetry(
-        error instanceof Error ? error.message : 'Telemetry delivery failed.',
+        error instanceof Error ? error.message : "Telemetry delivery failed.",
       );
     }
   }
 
   private retryingResult(): TelemetryFlushResult {
     return {
-      status: 'retrying',
+      status: "retrying",
       accepted: 0,
       rejected: 0,
       attempt: this.retryAttempt,
@@ -512,7 +550,7 @@ export class DarwinTelemetryClient {
   private readonly captureClick = (event: MouseEvent) => {
     const origin = event.target;
     if (!(origin instanceof Element)) return;
-    const target = origin.closest<HTMLElement>('[data-darwin-id]');
+    const target = origin.closest<HTMLElement>("[data-darwin-id]");
     const targetId = target?.dataset.darwinId;
     if (!targetId) return;
 
@@ -531,7 +569,7 @@ export class DarwinTelemetryClient {
     const clickCount = Math.min(3, Math.max(1, event.detail || 1));
 
     this.enqueue({
-      eventType: 'element_clicked',
+      eventType: "element_clicked",
       targetId,
       ...this.attemptFields(),
       properties: {
@@ -545,11 +583,11 @@ export class DarwinTelemetryClient {
     });
 
     if (!interactive) {
-      this.emitSignal('false_affordance', pointerType, targetId, 1, 0);
+      this.emitSignal("false_affordance", pointerType, targetId, 1, 0);
     }
     if (clickCount >= 2) {
       this.emitSignal(
-        'unexpected_double_click',
+        "unexpected_double_click",
         pointerType,
         targetId,
         clickCount,
@@ -568,7 +606,7 @@ export class DarwinTelemetryClient {
     ) {
       this.rageSignalAt.set(targetId, now);
       this.emitSignal(
-        'rage_click',
+        "rage_click",
         pointerType,
         targetId,
         recentClicks.length,
@@ -581,7 +619,7 @@ export class DarwinTelemetryClient {
     const target = semanticTargetOf(event.target);
     const targetId = target?.dataset.darwinId;
     const pointerType = pointerTypeOf(event);
-    if (!targetId || pointerType === 'touch') return;
+    if (!targetId || pointerType === "touch") return;
     if (
       event.relatedTarget instanceof Node &&
       target.contains(event.relatedTarget)
@@ -592,7 +630,7 @@ export class DarwinTelemetryClient {
     const now = Date.now();
     this.hovers.set(targetId, { startedAt: now, pointerType, clickedAt: null });
     this.enqueue({
-      eventType: 'hover_started',
+      eventType: "hover_started",
       targetId,
       ...this.attemptFields(),
       properties: { pointerType },
@@ -600,7 +638,7 @@ export class DarwinTelemetryClient {
 
     if (this.lastTransition?.targetId !== targetId) {
       this.enqueue({
-        eventType: 'pointer_transition',
+        eventType: "pointer_transition",
         targetId,
         ...this.attemptFields(),
         properties: {
@@ -635,7 +673,7 @@ export class DarwinTelemetryClient {
       Math.max(0, Date.now() - hover.startedAt),
     );
     this.enqueue({
-      eventType: 'hover_ended',
+      eventType: "hover_ended",
       targetId,
       ...this.attemptFields(),
       properties: {
@@ -663,7 +701,7 @@ export class DarwinTelemetryClient {
       pointerType: pointerTypeOf(event),
       draggable:
         target?.draggable === true ||
-        target?.dataset.darwinDraggable === 'true',
+        target?.dataset.darwinDraggable === "true",
       emitted: false,
     };
   };
@@ -678,7 +716,7 @@ export class DarwinTelemetryClient {
   };
 
   private readonly capturePointerCancel = (event: PointerEvent) => {
-    if (pointerTypeOf(event) === 'touch') this.emitTouchCancelled(event.target);
+    if (pointerTypeOf(event) === "touch") this.emitTouchCancelled(event.target);
     this.dragState = null;
   };
 
@@ -693,10 +731,10 @@ export class DarwinTelemetryClient {
       ? Math.min(600_000, Math.max(0, Date.now() - this.dragState.startedAt))
       : 0;
     this.enqueue({
-      eventType: 'touch_cancelled',
+      eventType: "touch_cancelled",
       ...(targetId ? { targetId } : {}),
       ...this.attemptFields(),
-      properties: { pointerType: 'touch', durationMs },
+      properties: { pointerType: "touch", durationMs },
     });
   }
 
@@ -707,7 +745,7 @@ export class DarwinTelemetryClient {
     if (distance < 12) return;
     drag.emitted = true;
     this.enqueue({
-      eventType: 'drag_attempted',
+      eventType: "drag_attempted",
       ...(drag.targetId ? { targetId: drag.targetId } : {}),
       ...this.attemptFields(),
       properties: {
@@ -720,7 +758,7 @@ export class DarwinTelemetryClient {
 
   private detectCursorThrashing(event: PointerEvent) {
     const pointerType = pointerTypeOf(event);
-    if (pointerType === 'touch') return;
+    if (pointerType === "touch") return;
     const now = Date.now();
     const previous = this.cursorState;
     if (!previous) {
@@ -756,7 +794,7 @@ export class DarwinTelemetryClient {
       this.lastThrashAt = now;
       const targetId = semanticTargetOf(event.target)?.dataset.darwinId;
       this.emitSignal(
-        'cursor_thrashing',
+        "cursor_thrashing",
         pointerType,
         targetId,
         this.directionChanges.length,
@@ -784,7 +822,7 @@ export class DarwinTelemetryClient {
     if (alternates && now - this.lastIndecisionAt > 2_000) {
       this.lastIndecisionAt = now;
       this.emitSignal(
-        'element_indecision',
+        "element_indecision",
         pointerType,
         targetId,
         4,
@@ -796,11 +834,11 @@ export class DarwinTelemetryClient {
 
   private emitSignal(
     signal:
-      | 'rage_click'
-      | 'false_affordance'
-      | 'unexpected_double_click'
-      | 'element_indecision'
-      | 'cursor_thrashing',
+      | "rage_click"
+      | "false_affordance"
+      | "unexpected_double_click"
+      | "element_indecision"
+      | "cursor_thrashing",
     pointerType: PointerKind,
     targetId: string | undefined,
     count: number,
@@ -808,7 +846,7 @@ export class DarwinTelemetryClient {
     relatedTargetIds?: string[],
   ) {
     this.enqueue({
-      eventType: 'interaction_signal',
+      eventType: "interaction_signal",
       ...(targetId ? { targetId } : {}),
       ...this.attemptFields(),
       properties: {
@@ -822,11 +860,11 @@ export class DarwinTelemetryClient {
   }
 
   private readonly captureVisibility = () => {
-    if (document.visibilityState === 'hidden') this.flushWithBeacon();
+    if (document.visibilityState === "hidden") this.flushWithBeacon();
   };
 
   private readonly capturePageHide = () => {
-    this.endSession();
+    this.endSession(false);
     this.flushWithBeacon();
   };
 
@@ -839,7 +877,7 @@ export class DarwinTelemetryClient {
     const fromScale = this.lastZoomScale;
     this.lastZoomScale = nextScale;
     this.enqueue({
-      eventType: 'viewport_zoom_changed',
+      eventType: "viewport_zoom_changed",
       ...this.attemptFields(),
       properties: {
         fromScale: clamp(fromScale, 0.25, 5),
@@ -848,10 +886,14 @@ export class DarwinTelemetryClient {
     });
   };
 
-  private endSession() {
-    if (this.activeAttempt) this.taskCompleted('abandoned');
+  private endSession(flushActiveAttempt = true) {
+    if (this.sessionEnded) return;
+    this.sessionEnded = true;
+    if (this.activeAttempt) {
+      this.taskCompleted("abandoned", flushActiveAttempt);
+    }
     this.enqueue({
-      eventType: 'session_ended',
+      eventType: "session_ended",
       durationMs: Math.max(0, Date.now() - this.startedAt),
     });
   }
@@ -865,9 +907,15 @@ export class DarwinTelemetryClient {
       offset < this.outbox.length;
       offset += this.config.batchSize
     ) {
-      const events = this.outbox.slice(offset, offset + this.config.batchSize);
-      const body = JSON.stringify(TelemetryBatchSchema.parse({ events }));
+      const events = this.outbox
+        .slice(offset, offset + this.config.batchSize)
+        .filter((event) => !this.beaconedEventIds.has(event.eventId));
+      if (!events.length) continue;
+      const batch = TelemetryBatchSchema.safeParse({ events });
+      if (!batch.success) continue;
+      const body = JSON.stringify(batch.data);
       if (!navigator.sendBeacon(this.config.endpoint, body)) break;
+      events.forEach((event) => this.beaconedEventIds.add(event.eventId));
     }
   }
 
@@ -876,6 +924,7 @@ export class DarwinTelemetryClient {
     this.outbox = this.outbox.filter(
       (event) => !deliveredIds.has(event.eventId),
     );
+    deliveredIds.forEach((eventId) => this.beaconedEventIds.delete(eventId));
   }
 
   private attemptFields() {
@@ -889,10 +938,10 @@ export class DarwinTelemetryClient {
 
   private enqueue(
     event:
-      | { eventType: 'session_started' | 'page_view' }
-      | { eventType: 'session_ended'; durationMs: number }
+      | { eventType: "session_started" | "page_view" }
+      | { eventType: "session_ended"; durationMs: number }
       | {
-          eventType: 'element_clicked';
+          eventType: "element_clicked";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
@@ -906,14 +955,14 @@ export class DarwinTelemetryClient {
           };
         }
       | {
-          eventType: 'hover_started';
+          eventType: "hover_started";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
           properties: { pointerType: PointerKind };
         }
       | {
-          eventType: 'hover_ended';
+          eventType: "hover_ended";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
@@ -926,7 +975,7 @@ export class DarwinTelemetryClient {
           };
         }
       | {
-          eventType: 'pointer_transition';
+          eventType: "pointer_transition";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
@@ -937,17 +986,17 @@ export class DarwinTelemetryClient {
           };
         }
       | {
-          eventType: 'interaction_signal';
+          eventType: "interaction_signal";
           targetId?: string;
           taskAttemptId?: string;
           taskId?: string;
           properties: {
             signal:
-              | 'rage_click'
-              | 'false_affordance'
-              | 'unexpected_double_click'
-              | 'element_indecision'
-              | 'cursor_thrashing';
+              | "rage_click"
+              | "false_affordance"
+              | "unexpected_double_click"
+              | "element_indecision"
+              | "cursor_thrashing";
             pointerType: PointerKind;
             count: number;
             windowMs: number;
@@ -955,7 +1004,7 @@ export class DarwinTelemetryClient {
           };
         }
       | {
-          eventType: 'drag_attempted';
+          eventType: "drag_attempted";
           targetId?: string;
           taskAttemptId?: string;
           taskId?: string;
@@ -966,67 +1015,67 @@ export class DarwinTelemetryClient {
           };
         }
       | {
-          eventType: 'touch_cancelled';
+          eventType: "touch_cancelled";
           targetId?: string;
           taskAttemptId?: string;
           taskId?: string;
           properties: {
-            pointerType: 'touch';
+            pointerType: "touch";
             durationMs: number;
           };
         }
-      | { eventType: 'route_changed'; properties: { fromRoute: string } }
+      | { eventType: "route_changed"; properties: { fromRoute: string } }
       | {
-          eventType: 'browser_navigation';
+          eventType: "browser_navigation";
           taskAttemptId?: string;
           taskId?: string;
           properties: {
-            direction: 'back' | 'forward';
+            direction: "back" | "forward";
             fromRoute: string;
             toRoute: string;
           };
         }
       | {
-          eventType: 'viewport_zoom_changed';
+          eventType: "viewport_zoom_changed";
           taskAttemptId?: string;
           taskId?: string;
           properties: { fromScale: number; toScale: number };
         }
       | {
-          eventType: 'validation_error';
+          eventType: "validation_error";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
           properties: { fieldId: string; errorCode: string };
         }
       | {
-          eventType: 'search_performed';
+          eventType: "search_performed";
           targetId: string;
           taskAttemptId?: string;
           taskId?: string;
           properties: { queryLength: number; resultCount: number };
         }
       | {
-          eventType: 'task_started';
+          eventType: "task_started";
           taskAttemptId: string;
           taskId: string;
         }
       | {
-          eventType: 'task_completed';
-          taskAttemptId: string;
-          taskId: string;
-          durationMs: number;
-          outcome: 'success';
-        }
-      | {
-          eventType: 'task_failed';
+          eventType: "task_completed";
           taskAttemptId: string;
           taskId: string;
           durationMs: number;
-          outcome: 'failed' | 'abandoned';
+          outcome: "success";
         }
       | {
-          eventType: 'feedback_submitted';
+          eventType: "task_failed";
+          taskAttemptId: string;
+          taskId: string;
+          durationMs: number;
+          outcome: "failed" | "abandoned";
+        }
+      | {
+          eventType: "feedback_submitted";
           taskAttemptId?: string;
           taskId?: string;
           properties: { length: number };
@@ -1040,16 +1089,16 @@ export class DarwinTelemetryClient {
       studyId: this.config.studyId,
       appVersion: this.config.appVersion,
       source: this.config.source,
-      ...(this.config.provenance
-        ? { provenance: this.config.provenance }
-        : {}),
+      ...(this.config.provenance ? { provenance: this.config.provenance } : {}),
       occurredAt: new Date().toISOString(),
-      sequence: this.sequence++,
+      sequence: this.sequence,
       route: this.currentRoute,
       viewport: getViewportClass(),
       ...event,
     };
     const parsed = StudyTelemetryEventSchema.parse(candidate);
+    this.sequence += 1;
+    this.persistSequence();
     this.outbox.push(parsed);
     if (this.outbox.length > this.config.maxOutboxSize) {
       const overflow = this.outbox.length - this.config.maxOutboxSize;
@@ -1079,18 +1128,36 @@ export class DarwinTelemetryClient {
         return parsed.success ? [parsed.data] : [];
       });
     } catch {
-      this.persistentStorageAvailable = false;
       this.storageFailures += 1;
       return [];
     }
   }
 
   private persistOutbox() {
-    if (!this.persistentStorageAvailable) return;
     try {
       localStorage.setItem(this.outboxKey, JSON.stringify(this.outbox));
     } catch {
-      this.persistentStorageAvailable = false;
+      this.storageFailures += 1;
+      this.notifyHealth();
+    }
+  }
+
+  private readSequence() {
+    try {
+      const stored = localStorage.getItem(this.sequenceKey);
+      if (stored === null) return 0;
+      const value = Number(stored);
+      return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    } catch {
+      this.storageFailures += 1;
+      return 0;
+    }
+  }
+
+  private persistSequence() {
+    try {
+      localStorage.setItem(this.sequenceKey, String(this.sequence));
+    } catch {
       this.storageFailures += 1;
       this.notifyHealth();
     }
