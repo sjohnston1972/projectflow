@@ -931,6 +931,23 @@ function Dashboard({
           data-darwin-id="dashboard-project-health-panel"
         >
           <PanelHeading title="Project health" meta="All projects" />
+          <div className="status-filter" data-darwin-id="dashboard-status-filter">
+            {[...new Set(projects.map((project) => project.status))].map(
+              (status) => (
+                <span
+                  key={status}
+                  className={`status-chip status-${status
+                    .toLowerCase()
+                    .replace(" ", "-")}`}
+                  data-darwin-id={`dashboard-status-filter-${status
+                    .toLowerCase()
+                    .replace(" ", "-")}`}
+                >
+                  {status}
+                </span>
+              ),
+            )}
+          </div>
           <div className="project-health-list">
             {projects.map((project) => (
               <button
