@@ -644,6 +644,32 @@ button {
   background: #fde9e5;
 }
 
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid #d9e0e6;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.status-chip:hover {
+  border-color: #9db2c4;
+  background: #f2f6fa;
+}
+
 .activity-list {
   display: grid;
   gap: 14px;
